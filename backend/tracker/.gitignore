@@ -1,0 +1,26 @@
+# start-dev.sh vendors third-party packages into this directory with
+# `pip install --target`. Those must never be committed. Ignore everything,
+# then explicitly re-include our own source tree.
+*
+
+!.gitignore
+!requirements.txt
+!function.py
+!router.py
+
+!common/
+!common/**
+!auth/
+!auth/**
+!employees/
+!employees/**
+!migrations/
+!migrations/**
+!scripts/
+!scripts/**
+!tests/
+!tests/**
+
+# ...but never commit bytecode caches, even inside the whitelisted dirs above.
+__pycache__/
+*.py[cod]

@@ -237,6 +237,11 @@ tmp
 .DS_Store
 Thumbs.db
 
+# Backend: local virtualenv and Lambda-vendored packages (installed by start-dev.sh)
+backend/.venv/
+.pip_installed
+# (vendored packages under backend/tracker/ are ignored by backend/tracker/.gitignore)
+
 # Frontend build artifacts and dependencies
 frontend/node_modules/
 

@@ -1,0 +1,5 @@
+# Pure-Python only. start-dev.sh vendors these with the 3.14 pip while the
+# Lambda runtime is 3.13, so anything with compiled wheels (psycopg, argon2,
+# bcrypt) would break after deploy. pg8000 and PyJWT are pure Python.
+pg8000==1.31.2
+PyJWT==2.10.1
