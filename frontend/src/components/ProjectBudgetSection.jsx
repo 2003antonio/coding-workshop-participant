@@ -25,7 +25,7 @@ export default function ProjectBudgetSection({ project, role }) {
   const showLines = canSeeSalaries(role)
 
   return (
-    <LoadState result={result} label="Loading budget">
+    <LoadState result={result} label="Loading budget" skeleton="cards">
       {(budget) => {
         const hasBudget = budget.planned_budget !== null && budget.planned_budget !== undefined
         const people = budget.allocated_people

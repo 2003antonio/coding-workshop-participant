@@ -112,7 +112,7 @@ export default function ProjectsPage() {
         <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>
       )}
 
-      <LoadState result={projects} label="Loading projects">
+      <LoadState result={projects} label="Loading projects" skeleton="table">
         {(rows) => {
           const shown = rows.filter(matches)
           const filtered = Boolean(needle || status || teamId)

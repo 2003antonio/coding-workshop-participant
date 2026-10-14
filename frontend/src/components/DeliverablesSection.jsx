@@ -103,7 +103,7 @@ export default function DeliverablesSection({ project, canEdit }) {
           {notice.text}
         </Alert>
       )}
-      <LoadState result={result} label="Loading deliverables">
+      <LoadState result={result} label="Loading deliverables" skeleton="table">
         {() => (
           <ResponsiveTable label="Deliverables" rows={rows} empty="No deliverables yet." columns={[
             { key: 'name', label: 'Deliverable', primary: true, render: (d) => (

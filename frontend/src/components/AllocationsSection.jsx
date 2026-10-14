@@ -182,7 +182,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
       )}
       {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
       {people.status === 'error' && <Alert severity="warning" sx={{ mb: 2 }}>{people.error}</Alert>}
-      <LoadState result={result} label="Loading assignments">
+      <LoadState result={result} label="Loading assignments" skeleton="table">
         {(rows) => (
           <ResponsiveTable label="Assignments" rows={rows} empty="No one is assigned yet." columns={[
             { key: 'person', label: 'Person', primary: true, render: (a) => a.employee.name },

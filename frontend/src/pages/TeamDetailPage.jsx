@@ -13,7 +13,7 @@ import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import BudgetPanel from '../components/BudgetPanel'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { Loading, LoadError, LoadState } from '../components/PageState'
+import { LoadError, LoadState, LoadingSkeleton } from '../components/PageState'
 import ResponsiveTable from '../components/ResponsiveTable'
 import { AddMemberDialog, TeamFormDialog } from '../components/TeamDialogs'
 import * as budgetService from '../services/budgetService'
@@ -30,7 +30,7 @@ function TeamBudget({ teamId }) {
     [teamId],
   )
   const budget = useLoad(load)
-  if (budget.status === 'loading') return <Loading label="Loading team budget" />
+  if (budget.status === 'loading') return <LoadingSkeleton variant="cards" label="Loading team budget" />
   if (budget.status === 'error') return <LoadError message={budget.error} onRetry={budget.reload} />
   const { weekly, yearly, member_count: count, hidden_reason: reason } = budget.data
   return (
@@ -95,7 +95,7 @@ export default function TeamDetailPage() {
   return (
     <AppShell maxWidth="lg">
       <Link component={RouterLink} to="/teams" sx={{ display: 'inline-block', mb: 2 }}>← All teams</Link>
-      <LoadState result={team} label="Loading team">
+      <LoadState result={team} label="Loading team" skeleton="detail">
         {(data) => (
           <Stack spacing={3}>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>

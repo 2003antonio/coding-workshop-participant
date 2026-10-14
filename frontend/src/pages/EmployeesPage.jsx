@@ -3,7 +3,6 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
-import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
@@ -24,6 +23,7 @@ import { EMPLOYEE_LIST_ROLES, canManageEmployees } from '../auth/roles'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
+import { LoadingSkeleton } from '../components/PageState'
 import * as employeeService from '../services/employeeService'
 import { withSessionRetry } from '../services/sessionRetry'
 import * as teamService from '../services/teamService'
@@ -211,9 +211,7 @@ export default function EmployeesPage() {
       )}
 
       {loadState === 'loading' && (
-        <Box role="status" aria-label="Loading employees" sx={{ display: 'grid', placeItems: 'center', py: 6 }}>
-          <CircularProgress />
-        </Box>
+        <LoadingSkeleton variant="table" label="Loading employees" />
       )}
       {loadState === 'error' && <Alert severity="error">{loadError}</Alert>}
 

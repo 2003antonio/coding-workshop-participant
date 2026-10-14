@@ -63,7 +63,7 @@ export default function TeamsPage() {
       {notice && (
         <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>
       )}
-      <LoadState result={teams} label="Loading teams">
+      <LoadState result={teams} label="Loading teams" skeleton="table">
         {(rows) => (
           <ResponsiveTable label="Teams" rows={rows} empty={emptyText} columns={[
             { key: 'name', label: 'Team', primary: true, render: (t) => (

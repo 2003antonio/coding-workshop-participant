@@ -66,7 +66,7 @@ export default function ProjectDetailPage() {
   return (
     <AppShell maxWidth="lg">
       <Link component={RouterLink} to="/projects" sx={{ display: 'inline-block', mb: 2 }}>← All projects</Link>
-      <LoadState result={result} label="Loading project">
+      <LoadState result={result} label="Loading project" skeleton="detail">
         {(project) => {
           const canEdit = canManageProject(role, user, project) && !project.archived_at
           const tabs = [
