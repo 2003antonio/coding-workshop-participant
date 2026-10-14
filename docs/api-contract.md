@@ -86,12 +86,9 @@ Project shape:
 ```json
 { "id": "uuid", "team": {"id": "uuid", "name": "Platform"}, "manager": {"id": "uuid", "name": "Ana"},
   "name": "Billing v2", "description": "", "status": "active",
-  "start_date": "2026-11-02", "end_date": "2027-03-31", "planned_budget": 52000.00, "archived_at": null }
+  "start_date": "2026-11-02", "end_date": "2027-03-31", "archived_at": null }
 ```
 `manager` is always the team's current lead (derived, not stored).
-`planned_budget` (money or `null` = not set) is included only for admin and the project's
-manager; other viewers get the shape without it. It is stored in a new nullable column
-`projects.planned_budget` (≥ 0, 2 decimals).
 **ASSUMPTION:** `status` is one of `planned | active | on_hold | completed`.
 
 Visibility (applies to every project, deliverable, allocation and report endpoint):
@@ -102,15 +99,13 @@ where they have a non-archived allocation (past, current or future — **ASSUMPT
 |---|---|---|---|
 | `GET /?team_id=&status=&include_archived=` | all (filtered by visibility) | — | `200 {"projects": [...]}` |
 | `GET /{id}` | all who can see it | — | `200 project` |
-| `POST /` | admin; manager for a team they lead (**ASSUMPTION**) | `{"team_id", "name", "description?", "status?", "start_date", "end_date", "planned_budget?"}` | `201 project` |
-| `PUT /{id}` | admin; the project's manager | any of `name, description, status, start_date, end_date, planned_budget` (`null` clears it); `team_id` admin only | `200 project` |
+| `POST /` | admin; manager for a team they lead (**ASSUMPTION**) | `{"team_id", "name", "description?", "status?", "start_date", "end_date"}` | `201 project` |
+| `PUT /{id}` | admin; the project's manager | any of `name, description, status, start_date, end_date`; `team_id` admin only | `200 project` |
 | `POST /{id}/archive` | admin; the project's manager | — | `200 project` |
 | `GET /{id}/budget` | admin; the project's manager | — | `200 budget` (see §7) |
 
 Rules and errors:
 - `start_date <= end_date` → else `400 invalid_dates`. `status` defaults to `planned`.
-- `planned_budget`: a number ≥ 0 with at most 2 decimals, max 9,999,999,999.99, or `null`
-  → else `400 bad_request`. Defaults to `null`.
 - `team_id` must be an active team → `400 invalid_team`; a manager naming a team they do not
   lead → `403 forbidden`.
 - Shrinking the dates so an allocation or deliverable falls outside → `409 dates_conflict`.
@@ -205,42 +200,20 @@ Known limit: comparing totals before and after one person joins or leaves can st
 - `yearly` = sum of active members' annual salaries; `weekly` = yearly / 52. The lead is never
   a member (§3), so their own salary is never in it.
 
-**Project budget** — `GET /api/projects/{id}/budget` (admin, the project's manager).
-
-Admin view (always all numbers, plus the per-person `lines`):
+**Project budget** — `GET /api/projects/{id}/budget` (admin, the project's manager):
 ```json
-{ "project_id": "uuid", "planned_budget": 12000.00, "committed_cost": 9977.73,
-  "used_cost_to_date": 3090.78, "percent_used": 25.8, "over_budget": false,
-  "hidden_reason": null, "allocated_people": 3,
-  "lines": [{"allocation_id": "uuid", "employee": {"id": "uuid", "name": "Bo"}, "hours_per_week": 10,
-             "weeks": 7, "hourly_rate": 40.00, "committed_cost": 2800.00, "used_cost_to_date": 800.00}] }
-```
-Manager view, `allocated_people` ≥ `MIN_AGGREGATE_GROUP` (totals, never `lines`):
-```json
-{ "project_id": "uuid", "planned_budget": 12000.00, "committed_cost": 9977.73,
-  "used_cost_to_date": 3090.78, "percent_used": 25.8, "over_budget": false,
-  "hidden_reason": null, "allocated_people": 3 }
-```
-Hidden view, a manager with `allocated_people` < `MIN_AGGREGATE_GROUP`:
-```json
-{ "project_id": "uuid", "planned_budget": 50000.00, "committed_cost": null,
-  "used_cost_to_date": null, "percent_used": null, "over_budget": null,
-  "hidden_reason": "below_min_group", "allocated_people": 2 }
+{ "project_id": "uuid", "planned": 52000.00, "used": 18400.00, "remaining": 33600.00,
+  "allocated_people": 3, "hidden_reason": null,
+  "lines": [{"allocation_id": "uuid", "employee": {"id": "uuid", "name": "Bo"},
+             "hours_per_week": 20, "weeks": 7, "hourly_rate": 52.88, "planned": 7403.85, "used": 2115.38}] }
 ```
 - Per allocation: cost = `hours_per_week × hourly_rate × weeks touched` (same week rule as §1).
-- `committed_cost` = cost of every active allocation over its whole range.
-  `used_cost_to_date` = cost of the weeks up to and including the current week.
-- `planned_budget` is the typed figure from the project (§4), `null` when not set. It is not
-  derived from pay, so it is shown in the hidden view too.
-- `percent_used` = `used_cost_to_date / planned_budget × 100`, rounded to **one decimal**;
-  `null` when there is no planned budget or it is `0`.
-- `over_budget` = `committed_cost > planned_budget` (comparing the rounded `committed_cost`);
-  `null` when there is no planned budget.
-- **Hiding:** for a manager in a group below `MIN_AGGREGATE_GROUP`, `committed_cost`,
-  `used_cost_to_date`, `percent_used` and `over_budget` are all `null` and `hidden_reason` is
-  `"below_min_group"` (a manager sees the hours, so a small total would reveal a rate).
-  Admins and the manager see them whenever the costs are visible.
-- `lines` is **admin only**.
+- `planned` = cost over the allocation's whole range. `used` = cost of the weeks up to and
+  including the current week. **ASSUMPTION:** "planned" is computed from allocations; there is
+  no separate budget figure typed in. (Option: add `projects.planned_budget` set by admin.)
+- `lines` is **admin only**. Managers get totals only, and only when `allocated_people` is at
+  least `MIN_AGGREGATE_GROUP`; otherwise `planned`, `used`, `remaining` are `null` with
+  `"hidden_reason": "below_min_group"` (a manager sees the hours, so a small total would reveal a rate).
 
 ## 8. Reports (`/api/reports`, all `GET`)
 
@@ -258,8 +231,7 @@ Date windows: `from`/`to` default to the current week plus the next 11 (12 weeks
    **ASSUMPTION** reasons: `past_end_date` (not completed after end date), `overdue_deliverable`,
    `blocked_past_start` (start date passed, dependencies not done), `dependency_date_conflict`
    (starts before a dependency is due), `unstaffed` (active, no allocation this week),
-   `over_budget` (admin only: the project's `over_budget` from §7 is `true`). Only projects with
-   ≥ 1 reason are listed.
+   `over_budget` (admin only: `used > planned`). Only projects with ≥ 1 reason are listed.
 
 3. **Resource allocation** — `/resource-allocation?from=&to=&team_id=` — admin: everyone;
    manager: members of teams they lead; employee: themselves.
@@ -288,11 +260,9 @@ Date windows: `from`/`to` default to the current week plus the next 11 (12 weeks
    deliverable plus everything upstream and downstream of it. Missing `project_id` → `400`.
 
 7. **Budget used vs planned** — `/budget?team_id=` — admin, manager. Employees → `403`.
-   `{"projects": [{"id", "name", "team", "planned_budget", "committed_cost", "used_cost_to_date",
-   "percent_used", "over_budget", "hidden_reason"}], "teams": [{"id", "name", "weekly", "yearly", "hidden_reason"}]}`.
-   Project fields have exactly the definitions and hiding of the project budget (§7), so a row
-   always equals that project's `GET /api/projects/{id}/budget` for the same caller (without
-   `lines` and `allocated_people`). No per-person lines here, even for admin.
+   `{"projects": [{"id", "name", "team", "planned", "used", "remaining", "percent_used", "hidden_reason"}],
+   "teams": [{"id", "name", "weekly", "yearly", "hidden_reason"}]}`.
+   Managers get totals only, hidden below `MIN_AGGREGATE_GROUP` exactly as in §7. No per-person lines here, even for admin.
 
 ## 9. Error codes added in this block
 
