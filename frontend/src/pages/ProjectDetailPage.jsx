@@ -18,9 +18,10 @@ import AppShell from '../components/AppShell'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DeliverablesSection from '../components/DeliverablesSection'
 import { LoadState } from '../components/PageState'
-import ProjectBudgetSection from '../components/ProjectBudgetSection'
+import ProjectBudgetSection, { ProjectBudgetBar } from '../components/ProjectBudgetSection'
 import ProjectFormDialog from '../components/ProjectFormDialog'
 import StatusChip from '../components/StatusChip'
+import DependenciesSection from '../components/timeline/DependenciesSection'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { formatDate } from './format'
@@ -68,11 +69,13 @@ export default function ProjectDetailPage() {
       <Link component={RouterLink} to="/projects" sx={{ display: 'inline-block', mb: 2 }}>← All projects</Link>
       <LoadState result={result} label="Loading project" skeleton="detail">
         {(project) => {
-          const canEdit = canManageProject(role, user, project) && !project.archived_at
+          const canManage = canManageProject(role, user, project)
+          const canEdit = canManage && !project.archived_at
           const tabs = [
             ['deliverables', 'Deliverables'],
             ['people', 'People'],
-            ...(canManageProject(role, user, project) ? [['budget', 'Budget']] : []),
+            ...(canManage ? [['budget', 'Budget']] : []),
+            ['dependencies', 'Dependencies'],
           ]
           const current = tabs.some(([key]) => key === tab) ? tab : 'deliverables'
           return (
@@ -89,6 +92,7 @@ export default function ProjectDetailPage() {
                     {formatDate(project.start_date)} – {formatDate(project.end_date)}
                   </Typography>
                   {project.description && <Typography sx={{ mt: 1 }}>{project.description}</Typography>}
+                  {canManage && <Box sx={{ mt: 1.5 }}><ProjectBudgetBar project={project} /></Box>}
                 </Box>
                 {canEdit && (
                   <Box sx={{ display: 'flex', gap: 1 }}>
@@ -103,7 +107,7 @@ export default function ProjectDetailPage() {
 
               <Paper variant="outlined" sx={{ mb: 2 }}>
                 <Tabs value={current} onChange={(event, value) => setTab(value)} aria-label="Project sections"
-                  variant={isPhone ? 'fullWidth' : 'standard'}>
+                  variant={isPhone ? 'scrollable' : 'standard'} scrollButtons="auto" allowScrollButtonsMobile>
                   {tabs.map(([key, label]) => (
                     <Tab key={key} value={key} label={label} id={`tab-${key}`} aria-controls={`panel-${key}`} />
                   ))}
@@ -113,6 +117,7 @@ export default function ProjectDetailPage() {
                 {current === 'deliverables' && <DeliverablesSection project={project} canEdit={canEdit} />}
                 {current === 'people' && <AllocationsSection project={project} canEdit={canEdit} role={role} />}
                 {current === 'budget' && <ProjectBudgetSection project={project} role={role} />}
+                {current === 'dependencies' && <DependenciesSection project={project} />}
               </Box>
 
               {editing && (

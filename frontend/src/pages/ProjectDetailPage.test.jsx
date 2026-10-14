@@ -13,7 +13,7 @@ describe('Project detail: header and tabs', () => {
     expect(await screen.findByRole('heading', { name: 'Billing v2' })).toBeInTheDocument()
     expect(screen.getByText(/Platform · Manager: Max Manager · Nov 2, 2026 – Mar 31, 2027/)).toBeInTheDocument()
     expect(screen.getByText('New invoices')).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People', 'Budget'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People', 'Budget', 'Dependencies'])
 
     await user.click(screen.getByRole('button', { name: 'Archive project' }))
     const dialog = await screen.findByRole('dialog', { name: 'Archive Billing v2?' })
@@ -28,7 +28,7 @@ describe('Project detail: header and tabs', () => {
     const server = signedInAs('employee')
     const { user } = renderApp('/projects/p-1')
     await deliverablesTable()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People', 'Dependencies'])
     expect(headersOf('Deliverables')).toEqual(['Deliverable', 'Dates', 'Status', 'Depends on'])
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add deliverable|edit project|archive project|dependencies/i }))
