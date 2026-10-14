@@ -6,7 +6,6 @@ import FormGroup from '@mui/material/FormGroup'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
 import TextField from '@mui/material/TextField'
-import { dependencyDetails } from '../pages/deliverableText'
 import { formatDate } from '../pages/format'
 import FormDialog from './FormDialog'
 import { DateField } from './ProjectFormDialog'
@@ -76,7 +75,7 @@ export function DeliverableFormDialog({ project, deliverables, onClose, onSubmit
 
   return (
     <FormDialog id="deliverable-form-title" title="Add deliverable" submitLabel="Add deliverable" onClose={onClose}
-      validate={validate} onSubmit={onSubmit} renderDetails={(error) => dependencyDetails(error, deliverables)}>
+      validate={validate} onSubmit={onSubmit} errorContext={{ deliverables }}>
       <TextField label="Name" required autoFocus {...field('name')} sx={{ mt: 1 }} />
       <TextField label="Description" multiline minRows={2} {...field('description')} />
       <DateField label="Start date" {...field('start_date')} slotProps={{ inputLabel: { shrink: true }, htmlInput: inProject }} />
@@ -102,8 +101,7 @@ export function DependenciesDialog({ deliverable, deliverables, onClose, onSubmi
 
   return (
     <FormDialog id="dependencies-title" title={`Dependencies of ${deliverable.name}`} submitLabel="Save dependencies"
-      onClose={onClose} validate={validate} onSubmit={onSubmit}
-      renderDetails={(err) => dependencyDetails(err, deliverables)}>
+      onClose={onClose} validate={validate} onSubmit={onSubmit} errorContext={{ deliverables }}>
       <DependencyPicker options={options} selected={dependsOn} onChange={setDependsOn} error={error} />
     </FormDialog>
   )

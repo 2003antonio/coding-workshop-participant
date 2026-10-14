@@ -8,18 +8,21 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import { useMediaQuery } from 'react-responsive'
 import { messageFor } from '../pages/apiMessages'
+import { detailsSentence } from '../services/errorDetails'
 
 /**
  * A form in a dialog. On submit, validate() returns the payload (or null to stop);
  * onSubmit(payload) returns a promise. If it rejects, the dialog stays open with
- * a friendly message, plus renderDetails(error) for structured 409 details.
+ * a friendly message and, on its own line, the sentence for any structured 409
+ * details (services/errorDetails.js). errorContext.deliverables turns ids into names.
  */
 export default function FormDialog({
-  id, title, submitLabel, onClose, validate, onSubmit, renderDetails, children,
+  id, title, submitLabel, onClose, validate, onSubmit, errorContext, children,
 }) {
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const [serverError, setServerError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const details = serverError ? detailsSentence(serverError, errorContext) : null
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -45,7 +48,7 @@ export default function FormDialog({
           {serverError && (
             <Alert severity="error">
               {messageFor(serverError)}
-              {renderDetails?.(serverError)}
+              {details && <Box component="span" sx={{ display: 'block', mt: 0.5 }}>{details}</Box>}
             </Alert>
           )}
         </DialogContent>

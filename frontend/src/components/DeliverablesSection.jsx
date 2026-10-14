@@ -6,9 +6,9 @@ import Chip from '@mui/material/Chip'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import { useApi, useLoad } from '../auth/useApi'
+import { detailsSentence, namesOf } from '../services/errorDetails'
 import * as projectService from '../services/projectService'
 import { messageFor } from '../pages/apiMessages'
-import { dependencyDetails, namesOf } from '../pages/deliverableText'
 import { DELIVERABLE_STATUS, formatDate } from '../pages/format'
 import { DeliverableFormDialog, DependenciesDialog } from './DeliverableDialogs'
 import { LoadState } from './PageState'
@@ -56,9 +56,10 @@ export default function DeliverablesSection({ project, canEdit }) {
       setNotice({ severity: 'success', text: `${deliverable.name} is now ${DELIVERABLE_STATUS[status].toLowerCase()}.` })
       result.reload()
     } catch (error) {
+      const details = detailsSentence(error, { deliverables: rows })
       setNotice({
         severity: 'error',
-        text: `${deliverable.name}: ${messageFor(error)}${dependencyDetails(error, rows) ?? ''}`,
+        text: `${deliverable.name}: ${messageFor(error)}${details ? ` ${details}.` : ''}`,
       })
     } finally {
       setSaving(null)

@@ -296,7 +296,7 @@ function createApi(db, meId, today) {
     const graph = new Map(db.deliverables.map((d) => [d.id, d.id === deliverableId ? dependsOn : d.depends_on]))
     const path = []
     const visit = (id) => {
-      if (path.includes(id)) return [...path.slice(path.indexOf(id)), id]
+      if (path.includes(id)) return path.slice(path.indexOf(id))
       path.push(id)
       for (const next of graph.get(id) ?? []) {
         const cycle = visit(next)

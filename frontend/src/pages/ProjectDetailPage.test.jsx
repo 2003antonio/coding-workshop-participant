@@ -120,9 +120,8 @@ describe('Project detail: deliverables', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /Frontend/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Save dependencies' }))
 
-    expect(await within(dialog).findByText(
-      'That would make the dependencies go round in a loop. Loop: API spec → Frontend → Backend → API spec.',
-    )).toBeInTheDocument()
+    expect(await within(dialog).findByText('That would make the dependencies go round in a loop.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Loop: API spec -> Frontend -> Backend -> API spec')).toBeInTheDocument()
     expect(server.calls.at(-1).body).toEqual({ depends_on: ['d-3'] })
   })
 
@@ -148,7 +147,7 @@ describe('Project detail: deliverables', () => {
 })
 
 describe('Project detail: people', () => {
-  it('admin sees the weekly cost; assigning over 40 hours lists the weeks', async () => {
+  it('admin sees the weekly cost; assigning over 40 hours names the weeks', async () => {
     const server = signedInAs('admin')
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'People')
@@ -169,9 +168,7 @@ describe('Project detail: people', () => {
 
     // Eve already has 20 h here and 16 h on Data Lake in the week of Nov 16.
     expect(await within(dialog).findByText('This would put the person over 40 hours in some weeks.')).toBeInTheDocument()
-    const weeks = within(dialog).getByRole('list', { name: 'Weeks over 40 hours' })
-    expect(within(weeks).getAllByRole('listitem').map((li) => li.textContent))
-      .toEqual(['Week of Nov 16, 2026: 46 hours'])
+    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16 (46 h)')).toBeInTheDocument()
     expect(within(dialog).queryByText(/Data Lake/)).not.toBeInTheDocument()
     expect(server.calls.at(-1).body).toEqual({
       employee_id: 'u-3', project_id: 'p-1', hours_per_week: 10, start_date: '2026-11-02', end_date: '2027-03-31',

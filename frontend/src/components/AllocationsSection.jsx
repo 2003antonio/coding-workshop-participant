@@ -17,18 +17,6 @@ import { LoadState } from './PageState'
 import { DateField } from './ProjectFormDialog'
 import ResponsiveTable from './ResponsiveTable'
 
-/** The weeks that would go over 40 hours, from the 409's details (other projects are never named). */
-function overAllocatedWeeks(error) {
-  if (error?.code !== 'over_allocated' || !error.details?.weeks?.length) return null
-  return (
-    <Box component="ul" aria-label="Weeks over 40 hours" sx={{ m: 0, mt: 1, pl: 2.5 }}>
-      {error.details.weeks.map((w) => (
-        <li key={w.week_start}>Week of {formatDate(w.week_start)}: {w.hours} hours</li>
-      ))}
-    </Box>
-  )
-}
-
 /** Assign one person to this project. onSubmit({ employee_id, project_id, hours_per_week, start_date, end_date }). */
 function AssignDialog({ project, people, onClose, onSubmit }) {
   const [values, setValues] = useState({
@@ -65,7 +53,7 @@ function AssignDialog({ project, people, onClose, onSubmit }) {
 
   return (
     <FormDialog id="assign-title" title={`Assign someone to ${project.name}`} submitLabel="Assign"
-      onClose={onClose} validate={validate} onSubmit={onSubmit} renderDetails={overAllocatedWeeks}>
+      onClose={onClose} validate={validate} onSubmit={onSubmit}>
       <TextField select label="Person" required {...field('employee_id')} sx={{ mt: 1 }}
         helperText={errors.employee_id || ' '}>
         {people.length === 0 && <MenuItem value="" disabled>No one can be assigned</MenuItem>}
