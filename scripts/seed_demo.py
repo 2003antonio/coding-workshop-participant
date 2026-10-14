@@ -1,10 +1,11 @@
 """Seed a small demo organisation into the LOCAL database. LOCAL USE ONLY.
 
 Creates 1 admin, 2 managers and 8 employees (with salaries), 2 teams with a
-lead and 3+ members each (one employee stays on no team), 3 projects,
-deliverables with dependencies, and allocations that respect the 40-hour
-rule. Dates are relative to the current week, so the demo always has work in
-progress, something overdue, something blocked and someone near capacity.
+lead and 3+ members each, 3 projects, deliverables with dependencies, and
+allocations that respect the 40-hour rule. One employee (hal) has no team and
+no allocations, so the employee empty states can be shown. Dates are relative
+to the current week, so the demo always has work in progress, something
+overdue, something blocked and someone near capacity.
 
 Passwords come from environment variables (or .env.local), one per role, and
 are never printed or logged:
@@ -12,13 +13,17 @@ are never printed or logged:
 Each must be at least 12 characters.
 
 Refuses any database host other than localhost. Idempotent: if the demo admin
-already exists, nothing is changed.
+already exists, nothing is changed. With --reset, every employee, team,
+project, deliverable, allocation and refresh token is removed first (the audit
+log is kept), so the demo starts clean; it refuses if the database holds any
+account outside the demo domain.
 
 Usage (repo root):
-    .venv/Scripts/python.exe scripts/seed_demo.py      (Windows)
-    .venv/bin/python scripts/seed_demo.py              (Linux / macOS)
+    .venv/Scripts/python.exe scripts/seed_demo.py [--reset]      (Windows)
+    .venv/bin/python scripts/seed_demo.py [--reset]              (Linux / macOS)
 """
 
+import argparse
 import datetime
 import os
 import sys
@@ -37,6 +42,9 @@ _MIN_PASSWORD = 12
 PASSWORD_VARS = {"admin": "DEMO_ADMIN_PASSWORD", "manager": "DEMO_MANAGER_PASSWORD",
                  "employee": "DEMO_EMPLOYEE_PASSWORD"}
 DOMAIN = "acme-demo.test"
+# Every table --reset empties; the audit log is kept (its rows have no foreign keys).
+_RESET_TABLES = ("allocations", "deliverable_dependencies", "deliverables", "projects",
+                 "refresh_tokens", "teams", "employees")
 
 # (key, name, role, job title, annual salary)
 PEOPLE = [
@@ -84,11 +92,11 @@ DELIVERABLES = [
 # (person, project, hours per week, start offset, end offset)
 ALLOCATIONS = [
     ("ana", "billing", 30, -14, 60),
-    ("ana", "mobile", 6, 14, 40),      # 36 h in those weeks: near capacity
+    ("ana", "mobile", 6, 14, 40),      # 36 h in those weeks: near capacity; Mobile has
+                                       # 1 person, so its costs are hidden from its manager
     ("bo", "billing", 20, -14, 60),
     ("cy", "billing", 20, -7, 45),
     ("di", "billing", 15, 31, 50),
-    ("hal", "mobile", 10, 14, 70),     # Mobile has 2 people: hidden from its manager
     ("eli", "lake", 25, -7, 60),
     ("fay", "lake", 25, -7, 60),
     ("gus", "lake", 20, 0, 85),
@@ -105,6 +113,18 @@ def _passwords() -> Optional[dict]:
 
 def _email(key: str) -> str:
     return f"{key}@{DOMAIN}"
+
+
+def _reset() -> Optional[str]:
+    """Empty the demo tables. Returns why it refused, or None once done."""
+    others = db.query_one("SELECT count(*) AS n FROM employees WHERE lower(email) NOT LIKE %s",
+                          ("%@" + DOMAIN,))["n"]
+    if others:
+        return f"the database has {others} account(s) outside @{DOMAIN}"
+    with db.transaction():
+        db.execute("TRUNCATE " + ", ".join(_RESET_TABLES))
+        audit.record("demo_reset", None, None, None, {"tables": len(_RESET_TABLES)})
+    return None
 
 
 def _seed(passwords: dict, monday: datetime.date) -> dict:
@@ -151,6 +171,10 @@ def _seed(passwords: dict, monday: datetime.date) -> dict:
 
 def main(argv: Optional[list] = None) -> int:
     """Seed the demo. Returns a process exit code (0 ok or already seeded, 2 refused)."""
+    parser = argparse.ArgumentParser(description="Seed the local demo organisation.")
+    parser.add_argument("--reset", action="store_true",
+                        help="remove all employees, teams, projects and allocations first")
+    args = parser.parse_args(argv)
     load_local_env()
     if os.getenv("POSTGRES_HOST", "localhost") not in _LOCAL_HOSTS:
         print("Refusing to seed: POSTGRES_HOST is not a local database.", file=sys.stderr)
@@ -162,6 +186,12 @@ def main(argv: Optional[list] = None) -> int:
         return 2
 
     run_migrations()
+    if args.reset:
+        refused = _reset()
+        if refused:
+            print(f"Refusing to reset: {refused}.", file=sys.stderr)
+            return 2
+        print("Demo data removed.")
     if db.query_one("SELECT 1 AS hit FROM employees WHERE lower(email) = %s", (_email("admin"),)):
         print("Demo data already present; nothing changed.")
         return 0

@@ -137,3 +137,39 @@ def test_one_demo_project_is_over_its_planned_budget(demo_env):
         planned[r["name"]] = r["planned_budget"]
     over = sorted(name for name in committed if committed[name] > planned[name])
     assert over == ["Billing v2"]
+
+
+def test_hal_has_no_team_and_no_allocations(demo_env):
+    seed_demo.main([])
+    hal = db.query_one("SELECT id, team_id FROM employees WHERE email = 'hal@acme-demo.test'")
+    assert hal["team_id"] is None
+    assert db.query_one("SELECT count(*) AS n FROM allocations WHERE employee_id = %s",
+                        (hal["id"],))["n"] == 0
+
+
+def test_reset_puts_the_demo_back_as_seeded(demo_env, capsys):
+    seed_demo.main([])
+    expected = {name: _count(name) for name in seed_demo._RESET_TABLES if name != "refresh_tokens"}
+    db.execute("UPDATE projects SET archived_at = now(), name = 'renamed' WHERE name = 'Billing v2'")
+    db.execute("INSERT INTO refresh_tokens (employee_id, token_hash, expires_at) "
+               "SELECT id, 'x', now() + interval '1 day' FROM employees LIMIT 1")
+    audit_before = _count("audit_log")
+    assert seed_demo.main(["--reset"]) == 0
+    assert {name: _count(name) for name in expected} == expected
+    assert db.query_one("SELECT count(*) AS n FROM projects WHERE name = 'Billing v2' "
+                        "AND archived_at IS NULL")["n"] == 1
+    assert _count("refresh_tokens") == 0
+    assert _count("audit_log") > audit_before          # the audit log is kept, not emptied
+    out = capsys.readouterr()
+    assert "Demo data removed." in out.out
+    for password in _PASSWORDS.values():
+        assert password not in out.out + out.err
+
+
+def test_reset_refuses_when_other_accounts_exist(demo_env, capsys, make_employee):
+    seed_demo.main([])
+    make_employee(email="someone@acme.test")
+    before = _count("employees")
+    assert seed_demo.main(["--reset"]) == 2
+    assert "Refusing to reset" in capsys.readouterr().err
+    assert _count("employees") == before
