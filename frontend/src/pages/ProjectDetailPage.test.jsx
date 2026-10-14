@@ -224,7 +224,7 @@ describe('Project detail: people', () => {
 })
 
 describe('Project detail: budget', () => {
-  // Billing v2: planned budget 12,000; committed 9,977.73; used to date 3,090.78 (26% of the budget).
+  // Billing v2: planned budget 12,000; committed 9,977.73; used to date 3,090.78 (25.8% of the budget).
   it('admin sees the planned budget, costs, percent used, the flag and the cost per assignment', async () => {
     signedInAs('admin')
     const { user } = renderApp('/projects/p-1')
@@ -234,7 +234,7 @@ describe('Project detail: budget', () => {
     expect(figure('Planned budget')).toHaveTextContent('12,000.00')
     expect(figure('Committed cost')).toHaveTextContent('9,977.73')
     expect(figure('Used to date')).toHaveTextContent('3,090.78')
-    expect(figure('Percent used')).toHaveTextContent('26%')
+    expect(figure('Percent used')).toHaveTextContent('25.8%')
     expect(within(panel).getByText('Within budget')).toBeInTheDocument()
     expect(headersOf('Cost per assignment'))
       .toEqual(['Person', 'Hours per week', 'Weeks', 'Hourly rate', 'Committed', 'Used to date'])
@@ -288,6 +288,18 @@ describe('Project detail: budget', () => {
     expect(within(panel).queryByText(/over budget|within budget/i)).not.toBeInTheDocument()
   })
 
+  it('a planned budget of 0 shows no percent, and any cost is over budget', async () => {
+    const db = seedData()
+    db.projects.find((p) => p.id === 'p-1').planned_budget = 0
+    signedInAs('manager', { db })
+    const { user } = renderApp('/projects/p-1')
+    await openTab(user, 'Budget')
+    const panel = await screen.findByRole('region', { name: 'Project budget' })
+    expect(within(panel).getByText('Planned budget', { selector: 'dt' }).nextElementSibling).toHaveTextContent('0.00')
+    expect(within(panel).getByText('Percent used', { selector: 'dt' }).nextElementSibling).toHaveTextContent('—')
+    expect(within(panel).getByText('Over budget')).toBeInTheDocument()
+  })
+
   it('a budget error shows a fixed message', async () => {
     signedInAs('manager', {
       routes: { 'GET /api/projects/p-1/budget': () => reply(500, { error: { code: 'x', message: 'raw salary 90000' } }) },
@@ -328,7 +340,7 @@ describe('Project detail: edit and planned budget', () => {
     const panel = await screen.findByRole('region', { name: 'Project budget' })
     expect(await within(panel).findByText('Over budget')).toBeInTheDocument()
     expect(within(panel).getByText('Planned budget').nextElementSibling).toHaveTextContent('5,000.50')
-    expect(within(panel).getByText('Percent used').nextElementSibling).toHaveTextContent('62%')
+    expect(within(panel).getByText('Percent used').nextElementSibling).toHaveTextContent('61.8%')
   })
 
   it('clearing the planned budget sends null; other edits send only what changed', async () => {
@@ -393,6 +405,24 @@ describe('salary data never reaches a non-admin screen', () => {
         hourly_rate: 43.27, committed_cost: 6057.73, used_cost_to_date: 1730.78 }],
     }),
   }
+
+  it('a hidden group never shows percent used or the over-budget flag, even if they were sent', async () => {
+    signedInAs('u-6', {
+      routes: {
+        'GET /api/projects/p-2/budget': () => reply(200, {
+          project_id: 'p-2', planned_budget: 50000, committed_cost: null, used_cost_to_date: null,
+          percent_used: 41.5, over_budget: true, allocated_people: 2, hidden_reason: 'below_min_group',
+        }),
+      },
+    })
+    const { user } = renderApp('/projects/p-2')
+    await openTab(user, 'Budget')
+    const panel = await screen.findByRole('region', { name: 'Project budget' })
+    expect(within(panel).getByText(/Totals are hidden because fewer than 3 people/)).toBeInTheDocument()
+    expect(within(panel).queryByText(/41\.5/)).not.toBeInTheDocument()
+    expect(within(panel).queryByText(/percent used/i, { selector: 'dt' })).not.toBeInTheDocument()
+    expect(within(panel).queryByText(/over budget|within budget/i)).not.toBeInTheDocument()
+  })
 
   it('the weekly cost column is never shown to a non-admin', async () => {
     signedInAs('manager', { routes: leaky })

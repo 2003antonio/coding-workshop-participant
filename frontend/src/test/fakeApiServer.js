@@ -88,6 +88,7 @@ function weeksTouched(start, end) {
   return weeks
 }
 const round2 = (n) => Math.round(n * 100) / 100
+const round1 = (n) => Math.round(n * 10) / 10
 
 // ---- the server ----
 
@@ -184,8 +185,10 @@ function createApi(db, meId, today) {
    * assignments and hidden from non-admins below MIN_AGGREGATE_GROUP people:
    *   committed_cost    = cost of every assignment over its whole range
    *   used_cost_to_date = cost of the weeks up to and including this one
-   *   percent_used      = used_cost_to_date / planned_budget × 100 (null without a budget)
-   *   over_budget       = committed_cost > planned_budget (false without a budget)
+   *   percent_used      = used_cost_to_date / planned_budget × 100, one decimal
+   *                       (null when there is no planned budget or it is 0)
+   *   over_budget       = committed_cost > planned_budget (null when there is no planned budget)
+   * Same definitions and hiding in GET /api/projects/{id}/budget and report 7.
    */
   function projectMoney(project) {
     const rows = db.allocations.filter((a) => active(a) && a.project_id === project.id)
@@ -200,8 +203,8 @@ function createApi(db, meId, today) {
       planned_budget: budget,
       committed_cost: hidden ? null : round2(committed),
       used_cost_to_date: hidden ? null : round2(used),
-      percent_used: hidden || !budget ? null : round2((used / budget) * 100),
-      over_budget: hidden ? null : budget !== null && round2(committed) > budget,
+      percent_used: hidden || !budget ? null : round1((used / budget) * 100),
+      over_budget: hidden || budget === null ? null : round2(committed) > budget,
       hidden_reason: hidden ? 'below_min_group' : null,
     }
   }
