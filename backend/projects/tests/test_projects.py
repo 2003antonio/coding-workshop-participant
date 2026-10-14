@@ -37,7 +37,8 @@ def test_admin_sees_all_projects(api, world):
         "team": {"id": str(world["platform"]["id"]), "name": "Platform"},
         "manager": {"id": str(world["max"]["id"]), "name": "Max Manager"},
         "name": "Billing", "description": "", "status": "active",
-        "start_date": "2026-11-02", "end_date": "2027-03-31", "archived_at": None}
+        "start_date": "2026-11-02", "end_date": "2027-03-31", "archived_at": None,
+        "planned_budget": None}
 
 
 @pytest.mark.parametrize("who, visible", [
@@ -218,3 +219,51 @@ def test_archive_cascades_to_deliverables_and_allocations(api, world, factory, m
 def test_archive_permissions(api, world):
     assert api("POST", p(world["billing"], "/archive"), as_=world["e1"]).status == 403
     assert api("POST", p(world["billing"], "/archive"), as_=world["mia"]).status == 404
+
+
+# =====================================================================
+# Planned budget
+# =====================================================================
+def test_admin_and_manager_set_a_planned_budget(api, world):
+    resp = api("POST", LIST, as_=world["admin"], body=new_project(world["data"], planned_budget=52000.5))
+    assert resp.status == 201 and resp.json["planned_budget"] == 52000.5
+    resp = api("PUT", p(world["billing"]), as_=world["max"], body={"planned_budget": 75000})
+    assert resp.status == 200 and resp.json["planned_budget"] == 75000.0
+    assert api("GET", p(world["billing"]), as_=world["max"]).json["planned_budget"] == 75000.0
+
+
+def test_manager_sets_it_on_create(api, world):
+    resp = api("POST", LIST, as_=world["max"], body=new_project(world["platform"], planned_budget=1000))
+    assert resp.status == 201 and resp.json["planned_budget"] == 1000.0
+
+
+def test_null_clears_it_and_absent_keeps_it(api, world):
+    api("PUT", p(world["billing"]), as_=world["admin"], body={"planned_budget": 500})
+    assert api("PUT", p(world["billing"]), as_=world["admin"], body={"name": "B2"}).json["planned_budget"] == 500.0
+    resp = api("PUT", p(world["billing"]), as_=world["admin"], body={"planned_budget": None})
+    assert resp.status == 200 and resp.json["planned_budget"] is None
+
+
+def test_employees_never_see_the_planned_budget(api, world):
+    api("PUT", p(world["billing"]), as_=world["admin"], body={"planned_budget": 123456})
+    for path in (LIST, p(world["billing"])):
+        resp = api("GET", path, as_=world["e1"])
+        assert resp.status == 200 and "planned_budget" not in resp.text and "123456" not in resp.text
+
+
+def test_employees_cannot_set_it(api, world):
+    assert api("PUT", p(world["billing"]), as_=world["e1"], body={"planned_budget": 1}).status == 403
+
+
+@pytest.mark.parametrize("value", [-1, 1.005, "1000", True, 10_000_000_000])
+def test_planned_budget_validation(api, world, value):
+    resp = api("PUT", p(world["billing"]), as_=world["admin"], body={"planned_budget": value})
+    assert resp.status == 400 and resp.code == "bad_request"
+
+
+def test_planned_budget_change_is_audited_by_field_name_only(api, world, migrated_db):
+    api("PUT", p(world["billing"]), as_=world["max"], body={"planned_budget": 98765.43})
+    rows = migrated_db.query("SELECT details FROM audit_log WHERE action = 'project_updated'")
+    assert [r["details"] for r in rows] == [{"fields": ["planned_budget"]}]
+    api("PUT", p(world["billing"]), as_=world["max"], body={"planned_budget": 98765.43})
+    assert len(migrated_db.query("SELECT 1 FROM audit_log WHERE action = 'project_updated'")) == 1

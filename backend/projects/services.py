@@ -75,8 +75,10 @@ def _include_archived_allowed(actor: dict, include_archived: bool) -> None:
 # =====================================================================
 # Projects
 # =====================================================================
-def _project_view(row: dict) -> dict:
-    return {
+def _project_view(row: dict, actor: dict) -> dict:
+    """The public shape of a project. planned_budget is a typed-in figure, not a
+    salary, so the project's manager sees it too; employees never do."""
+    view = {
         "id": str(row["id"]),
         "team": {"id": str(row["team_id"]), "name": row["team_name"]},
         "manager": {"id": str(row["manager_id"]), "name": row["manager_name"]},
@@ -87,6 +89,9 @@ def _project_view(row: dict) -> dict:
         "end_date": _iso(row["end_date"]),
         "archived_at": _iso(row["archived_at"]),
     }
+    if _can_manage(actor, row):
+        view["planned_budget"] = budget.money(row["planned_budget"])
+    return view
 
 
 def list_projects(actor: dict, include_archived: bool, team_id: Optional[str],
@@ -101,11 +106,11 @@ def list_projects(actor: dict, include_archived: bool, team_id: Optional[str],
         rows = repository.list_projects(include_archived, team_id, status, lead_id=actor_id, q=q)
     else:
         rows = repository.list_projects(False, team_id, status, allocated_to=actor_id, q=q)
-    return [_project_view(row) for row in rows]
+    return [_project_view(row, actor) for row in rows]
 
 
 def get_project(actor: dict, project_id: str) -> dict:
-    return _project_view(_visible_project(actor, project_id))
+    return _project_view(_visible_project(actor, project_id), actor)
 
 
 def _check_team(actor: dict, team_id: str) -> None:
@@ -118,13 +123,14 @@ def _check_team(actor: dict, team_id: str) -> None:
 
 
 def create_project(actor: dict, team_id: str, name: str, description: str, status: str,
-                   start_date: datetime.date, end_date: datetime.date) -> dict:
+                   start_date: datetime.date, end_date: datetime.date,
+                   planned_budget: Optional[Decimal] = None) -> dict:
     if start_date > end_date:
         raise BadRequest("start_date must not be after end_date.", "invalid_dates")
     with db.transaction():
         _check_team(actor, team_id)
         project_id = repository.insert_project(team_id, name, description, status,
-                                               start_date, end_date)
+                                               start_date, end_date, planned_budget)
         audit.record("project_created", actor["id"], "project", project_id)
     return get_project(actor, project_id)
 

@@ -3,8 +3,10 @@ error shape stays consistent. Messages name the field, never echo its value.
 """
 
 import datetime
+import math
 import re
 import uuid
+from decimal import Decimal
 from typing import Optional
 
 from common.errors import BadRequest, NotFound
@@ -161,3 +163,22 @@ def require_int(body: dict, field: str, low: int, high: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
         raise BadRequest(f"Field {field} must be a whole number from {low} to {high}.")
     return value
+
+
+_MAX_MONEY = Decimal("9999999999.99")   # numeric(12, 2)
+
+
+def optional_money(body: dict, field: str) -> Optional[Decimal]:
+    """A JSON number from 0 to 9,999,999,999.99 with at most two decimals, or null."""
+    value = body.get(field)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or \
+            (isinstance(value, float) and not math.isfinite(value)):
+        raise BadRequest(f"Field {field} must be a number.")
+    amount = Decimal(str(value))
+    if amount < 0 or amount > _MAX_MONEY:
+        raise BadRequest(f"Field {field} must be between 0 and 9999999999.99.")
+    if amount != amount.quantize(Decimal("0.01")):
+        raise BadRequest(f"Field {field} must have at most two decimal places.")
+    return amount.quantize(Decimal("0.01"))

@@ -45,7 +45,7 @@ def _new_connection(settings):
 # =====================================================================
 # Migrations
 # =====================================================================
-ALL_VERSIONS = ["001", "002", "003", "004", "005"]
+ALL_VERSIONS = ["001", "002", "003", "004", "005", "006"]
 
 
 def test_migrations_apply_once_and_rerun_is_a_no_op(fresh_schema):
@@ -182,6 +182,14 @@ def test_done_deliverables_need_completed_at(migrated_db):
         db.execute("INSERT INTO deliverables (project_id, name, start_date, due_date, status) "
                    "VALUES (%s, 'D', '2026-11-02', '2026-11-03', 'done')", (project,))
     _assert_db_error(exc_info, "23514", "deliverables_check1")
+
+
+def test_planned_budget_cannot_be_negative(migrated_db):
+    team = _team(_insert_employee(role="manager")["id"])["id"]
+    project = _project(team)["id"]
+    with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
+        db.execute("UPDATE projects SET planned_budget = -1 WHERE id = %s", (project,))
+    _assert_db_error(exc_info, "23514", "projects_planned_budget_check")
 
 
 @pytest.mark.parametrize("hours", [0, 41])

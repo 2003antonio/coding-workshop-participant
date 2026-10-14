@@ -9,6 +9,7 @@ so date checks, status rules and the dependency cycle check cannot be raced.
 """
 
 import datetime
+from decimal import Decimal
 from typing import Optional
 
 from common import db
@@ -17,7 +18,7 @@ from common import db
 _PROJECT_SELECT = (
     "SELECT p.id, p.team_id, t.name AS team_name, t.lead_id AS manager_id, "
     "  l.name AS manager_name, p.name, p.description, p.status, p.start_date, "
-    "  p.end_date, p.archived_at "
+    "  p.end_date, p.planned_budget, p.archived_at "
     "FROM projects p JOIN teams t ON t.id = p.team_id JOIN employees l ON l.id = t.lead_id "
 )
 
@@ -95,25 +96,32 @@ def lock_team(team_id: str) -> Optional[dict]:
 
 
 def insert_project(team_id: str, name: str, description: str, status: str,
-                   start_date: datetime.date, end_date: datetime.date) -> str:
+                   start_date: datetime.date, end_date: datetime.date,
+                   planned_budget: Optional[Decimal]) -> str:
     row = db.query_one(
-        "INSERT INTO projects (team_id, name, description, status, start_date, end_date) "
-        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-        (team_id, name, description, status, start_date, end_date),
+        "INSERT INTO projects (team_id, name, description, status, start_date, end_date, "
+        "planned_budget) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (team_id, name, description, status, start_date, end_date, planned_budget),
     )
     return str(row["id"])
 
 
 def update_project(project_id: str, changes: dict) -> None:
-    """Set the given columns; keys must be among the editable ones."""
+    """Set the given columns; keys must be among the editable ones.
+
+    planned_budget may be set to None (cleared), so it is applied only when
+    the key is present rather than through COALESCE.
+    """
     db.execute(
         "UPDATE projects SET "
         "  team_id = COALESCE(%s, team_id), name = COALESCE(%s, name), "
         "  description = COALESCE(%s, description), status = COALESCE(%s, status), "
-        "  start_date = COALESCE(%s, start_date), end_date = COALESCE(%s, end_date) "
+        "  start_date = COALESCE(%s, start_date), end_date = COALESCE(%s, end_date), "
+        "  planned_budget = CASE WHEN %s THEN CAST(%s AS numeric) ELSE planned_budget END "
         "WHERE id = %s",
         (changes.get("team_id"), changes.get("name"), changes.get("description"),
-         changes.get("status"), changes.get("start_date"), changes.get("end_date"), project_id),
+         changes.get("status"), changes.get("start_date"), changes.get("end_date"),
+         "planned_budget" in changes, changes.get("planned_budget"), project_id),
     )
 
 

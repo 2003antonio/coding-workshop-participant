@@ -14,7 +14,8 @@ SERVICE_NAME = "projects"
 _MAX_NAME = 200
 _MAX_DESCRIPTION = 2000
 _MAX_SEARCH = 100
-_PROJECT_CREATE = ("team_id", "name", "description", "status", "start_date", "end_date")
+_PROJECT_CREATE = ("team_id", "name", "description", "status", "start_date", "end_date",
+                   "planned_budget")
 _PROJECT_UPDATE = _PROJECT_CREATE
 _DELIVERABLE_CREATE = ("name", "description", "start_date", "due_date", "depends_on")
 _DELIVERABLE_UPDATE = ("name", "description", "start_date", "due_date", "status")
@@ -36,6 +37,7 @@ _PROJECT_PARSERS = {
     "status": lambda d: validation.require_choice(d, "status", services.PROJECT_STATUSES),
     "start_date": lambda d: validation.require_date(d, "start_date"),
     "end_date": lambda d: validation.require_date(d, "end_date"),
+    "planned_budget": lambda d: validation.optional_money(d, "planned_budget"),
 }
 
 _DELIVERABLE_PARSERS = {
@@ -117,6 +119,7 @@ def create_project(params: dict, query: dict, body: object, headers: dict) -> di
         status=status,
         start_date=_PROJECT_PARSERS["start_date"](data),
         end_date=_PROJECT_PARSERS["end_date"](data),
+        planned_budget=_PROJECT_PARSERS["planned_budget"](data),
     ))
 
 

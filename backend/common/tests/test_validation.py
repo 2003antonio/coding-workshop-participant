@@ -1,6 +1,7 @@
 """Unit tests for common/validation.py and the error shape (no database)."""
 
 import datetime
+from decimal import Decimal
 
 import pytest
 
@@ -92,3 +93,16 @@ def test_require_int_rejects(value):
 def test_require_int_accepts_the_bounds():
     assert v.require_int({"h": 1}, "h", 1, 40) == 1
     assert v.require_int({"h": 40}, "h", 1, 40) == 40
+
+
+@pytest.mark.parametrize("value, expected", [(None, None), (0, Decimal("0.00")), (52000.5, Decimal("52000.50")),
+                                             (9999999999.99, Decimal("9999999999.99"))])
+def test_optional_money_accepts(value, expected):
+    assert v.optional_money({"m": value}, "m") == expected
+    assert v.optional_money({}, "m") is None
+
+
+@pytest.mark.parametrize("value", [-0.01, 10_000_000_000, 1.005, "100", True, [1], float("inf"), float("nan")])
+def test_optional_money_rejects(value):
+    with pytest.raises(BadRequest):
+        v.optional_money({"m": value}, "m")
