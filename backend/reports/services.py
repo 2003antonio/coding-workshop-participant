@@ -97,7 +97,11 @@ def project_status(actor: dict, team_id: Optional[str], status: Optional[str]) -
 # Project money, shared by at-risk (admin) and the budget report
 # =====================================================================
 def _project_money(project_ids: list, today: datetime.date) -> dict:
-    """{project_id: {"planned", "used", "people"}} with unrounded Decimals."""
+    """{project_id: {"planned", "used", "people"}} with unrounded Decimals.
+
+    "planned" is the committed cost: every active allocation over its full
+    range. "used" is the cost of the weeks up to and including this week.
+    """
     money = {pid: {"planned": Decimal(0), "used": Decimal(0), "people": set()} for pid in project_ids}
     for alloc in repository.project_allocations(project_ids) if project_ids else []:
         cost = budget.allocation_cost(alloc["hours_per_week"], alloc["salary"],
@@ -107,6 +111,13 @@ def _project_money(project_ids: list, today: datetime.date) -> dict:
         entry["used"] += cost["used"]
         entry["people"].add(str(alloc["employee_id"]))
     return money
+
+
+def _over_budget(project: dict, money: dict) -> Optional[bool]:
+    """Committed cost above the typed-in planned budget; None when no budget is set."""
+    if project["planned_budget"] is None:
+        return None
+    return money["planned"] > project["planned_budget"]
 
 
 # =====================================================================
@@ -140,7 +151,7 @@ def at_risk_projects(actor: dict) -> dict:
             reasons.append("dependency_date_conflict")
         if project["status"] == "active" and pid not in staffed:
             reasons.append("unstaffed")
-        if pid in money and money[pid]["used"] > money[pid]["planned"]:
+        if pid in money and _over_budget(project, money[pid]):
             reasons.append("over_budget")
         if reasons:
             result.append({"id": pid, "name": project["name"],
@@ -329,14 +340,21 @@ def budget_report(actor: dict, team_id: Optional[str]) -> dict:
     project_rows = []
     for project in projects:
         entry = money[str(project["id"])]
+        planned_budget = project["planned_budget"]
+        # Cost fields come from salaries, so they follow MIN_AGGREGATE_GROUP.
+        # The planned budget is typed in, not a salary, so it is always shown.
         hidden = budget.is_hidden(role, len(entry["people"]))
+        percent_used = None
+        if not hidden and planned_budget:
+            percent_used = budget.percent(entry["used"], planned_budget)
         project_rows.append({
             "id": str(project["id"]), "name": project["name"],
             "team": _ref(project, "team_id", "team_name"),
-            "planned": None if hidden else budget.money(entry["planned"]),
-            "used": None if hidden else budget.money(entry["used"]),
-            "remaining": None if hidden else budget.money(entry["planned"] - entry["used"]),
-            "percent_used": None if hidden else budget.percent(entry["used"], entry["planned"]),
+            "planned_budget": budget.money(planned_budget),
+            "committed_cost": None if hidden else budget.money(entry["planned"]),
+            "used_cost_to_date": None if hidden else budget.money(entry["used"]),
+            "percent_used": percent_used,
+            "over_budget": None if hidden else _over_budget(project, entry),
             "hidden_reason": budget.hidden_reason(hidden),
         })
 

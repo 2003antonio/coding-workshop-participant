@@ -28,7 +28,8 @@ def visible_projects(role: str, actor_id: str, team_id: Optional[str] = None,
                      status: Optional[str] = None, project_id: Optional[str] = None) -> list:
     """Active projects the caller may see, ordered by start date then name."""
     return db.query(
-        "SELECT p.id, p.name, p.status, p.start_date, p.end_date, p.team_id, t.name AS team_name, "
+        "SELECT p.id, p.name, p.status, p.start_date, p.end_date, p.planned_budget, "
+        "  p.team_id, t.name AS team_name, "
         "  t.lead_id AS manager_id, l.name AS manager_name "
         "FROM projects p JOIN teams t ON t.id = p.team_id JOIN employees l ON l.id = t.lead_id "
         "WHERE p.archived_at IS NULL "

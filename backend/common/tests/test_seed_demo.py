@@ -35,6 +35,7 @@ def test_seeds_the_demo_organisation(demo_env, capsys):
     assert {r["role"]: r["n"] for r in roles} == {"admin": 1, "manager": 2, "employee": 8}
     assert db.query_one("SELECT count(*) AS n FROM employees WHERE salary <= 0")["n"] == 0
     assert (_count("teams"), _count("projects")) == (2, 3)
+    assert db.query_one("SELECT count(*) AS n FROM projects WHERE planned_budget > 0")["n"] == 3
     assert _count("deliverable_dependencies") >= 3 and _count("allocations") >= 5
     out = capsys.readouterr()
     assert "admin@acme-demo.test" in out.out
@@ -120,3 +121,19 @@ def test_dates_follow_the_current_week(demo_env, monkeypatch):
     seed_demo.main([])
     starts = db.query_one("SELECT min(start_date) AS first FROM projects")["first"]
     assert starts == datetime.date(2030, 6, 10) - datetime.timedelta(days=14)
+
+
+def test_one_demo_project_is_over_its_planned_budget(demo_env):
+    from common import budget
+    seed_demo.main([])
+    rows = db.query(
+        "SELECT p.name, p.planned_budget, a.hours_per_week, a.start_date, a.end_date, e.salary "
+        "FROM projects p JOIN allocations a ON a.project_id = p.id JOIN employees e ON e.id = a.employee_id")
+    committed, planned = {}, {}
+    for r in rows:
+        cost = budget.allocation_cost(r["hours_per_week"], r["salary"], r["start_date"], r["end_date"],
+                                      weeks.today())
+        committed[r["name"]] = committed.get(r["name"], 0) + cost["planned"]
+        planned[r["name"]] = r["planned_budget"]
+    over = sorted(name for name in committed if committed[name] > planned[name])
+    assert over == ["Billing v2"]

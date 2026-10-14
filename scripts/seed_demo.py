@@ -59,11 +59,13 @@ TEAMS = [
     ("data", "Data", "ken", ["eli", "fay", "gus"]),
 ]
 
-# (key, team, name, status, start offset days, end offset days) from this week's Monday
+# (key, team, name, status, start offset days, end offset days, planned budget);
+# offsets are from this week's Monday. Billing's budget sits below its
+# committed cost, so the demo shows an over-budget project.
 PROJECTS = [
-    ("billing", "platform", "Billing v2", "active", -14, 120),
-    ("mobile", "platform", "Mobile app", "planned", 14, 150),
-    ("lake", "data", "Data lake", "active", -7, 90),
+    ("billing", "platform", "Billing v2", "active", -14, 120, 38000),
+    ("mobile", "platform", "Mobile app", "planned", 14, 150, 12000),
+    ("lake", "data", "Data lake", "active", -7, 90, 50000),
 ]
 
 # (key, project, name, status, start offset, due offset, depends on)
@@ -123,11 +125,11 @@ def _seed(passwords: dict, monday: datetime.date) -> dict:
                                     (name, ids[lead]))["id"]
             for member in members:
                 db.execute("UPDATE employees SET team_id = %s WHERE id = %s", (ids[key], ids[member]))
-        for key, team, name, status, start, end in PROJECTS:
+        for key, team, name, status, start, end, planned_budget in PROJECTS:
             ids[key] = db.query_one(
-                "INSERT INTO projects (team_id, name, status, start_date, end_date) "
-                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                (ids[team], name, status, day(start), day(end)))["id"]
+                "INSERT INTO projects (team_id, name, status, start_date, end_date, planned_budget) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                (ids[team], name, status, day(start), day(end), planned_budget))["id"]
         for key, project, name, status, start, due, depends_on in DELIVERABLES:
             ids[key] = db.query_one(
                 "INSERT INTO deliverables (project_id, name, status, start_date, due_date, completed_at) "

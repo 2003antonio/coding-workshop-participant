@@ -12,7 +12,17 @@ def by_name(rows):
     return {r["name"]: r for r in rows}
 
 
-def test_admin_gets_every_number(api, world):
+@pytest.fixture
+def budgets(world, migrated_db):
+    """Planned budgets: Billing 10000 (committed 11000: over), Lake 8000, Old 2000."""
+    for key, amount in (("billing", 10000), ("lake", 8000), ("old", 2000)):
+        migrated_db.execute("UPDATE projects SET planned_budget = %s WHERE id = %s",
+                            (amount, str(world[key]["id"])))
+    return world
+
+
+def test_admin_gets_every_number(api, budgets):
+    world = budgets
     resp = api("GET", URL, as_=world["admin"])
     assert resp.status == 200
     projects, teams = by_name(resp.json["projects"]), by_name(resp.json["teams"])
@@ -20,33 +30,55 @@ def test_admin_gets_every_number(api, world):
     # (used 1 wk = 1800); e3 10h x 1 wk x 40 = 400 (used 400).
     assert projects["Billing"] == {"id": str(world["billing"]["id"]), "name": "Billing",
                                    "team": {"id": str(world["platform"]["id"]), "name": "Platform"},
-                                   "planned": 11000.0, "used": 4200.0, "remaining": 6800.0,
-                                   "percent_used": 38.2, "hidden_reason": None}
+                                   "planned_budget": 10000.0, "committed_cost": 11000.0,
+                                   "used_cost_to_date": 4200.0, "percent_used": 42.0,
+                                   "over_budget": True, "hidden_reason": None}
     # Lake: e1 15h x 1 wk x 50 = 750; d1 20h x 5 wk x 45 = 4500; nothing used yet.
-    assert (projects["Lake"]["planned"], projects["Lake"]["used"]) == (5250.0, 0.0)
-    assert projects["Old"]["planned"] == 0.0 and projects["Old"]["percent_used"] == 0.0
+    lake = projects["Lake"]
+    assert (lake["committed_cost"], lake["used_cost_to_date"], lake["percent_used"], lake["over_budget"]) == \
+        (5250.0, 0.0, 0.0, False)
+    # Old: no allocations at all; admin still gets numbers.
+    assert projects["Old"]["committed_cost"] == 0.0 and projects["Old"]["over_budget"] is False
     assert teams["Platform"] == {"id": str(world["platform"]["id"]), "name": "Platform",
                                  "weekly": 6000.0, "yearly": 312000.0, "hidden_reason": None}
     assert teams["Data"]["yearly"] == 93600.0
 
 
-def test_manager_sees_totals_only_for_groups_of_three(api, world):
+def test_without_a_planned_budget_percent_and_over_budget_are_null(api, world):
+    billing = by_name(api("GET", URL, as_=world["admin"]).json["projects"])["Billing"]
+    assert billing["planned_budget"] is None and billing["committed_cost"] == 11000.0
+    assert billing["percent_used"] is None and billing["over_budget"] is None
+
+
+def test_a_zero_planned_budget_has_no_percent(api, world, migrated_db):
+    migrated_db.execute("UPDATE projects SET planned_budget = 0 WHERE id = %s", (str(world["billing"]["id"]),))
+    billing = by_name(api("GET", URL, as_=world["admin"]).json["projects"])["Billing"]
+    assert billing["percent_used"] is None and billing["over_budget"] is True
+
+
+def test_manager_sees_costs_only_for_groups_of_three(api, budgets):
+    world = budgets
     resp = api("GET", URL, as_=world["max"])
     projects, teams = by_name(resp.json["projects"]), by_name(resp.json["teams"])
     assert list(projects) == ["Old", "Billing"] and list(teams) == ["Platform"]
-    assert projects["Billing"]["planned"] == 11000.0 and projects["Billing"]["hidden_reason"] is None
-    # Old has nobody allocated: hidden, not zero.
-    assert projects["Old"]["planned"] is None and projects["Old"]["hidden_reason"] == "below_min_group"
+    assert projects["Billing"]["committed_cost"] == 11000.0 and projects["Billing"]["over_budget"] is True
+    assert projects["Billing"]["hidden_reason"] is None
+    # Old has nobody allocated: costs hidden, not zero, but the typed-in budget is shown.
+    assert projects["Old"] == {"id": str(world["old"]["id"]), "name": "Old",
+                               "team": {"id": str(world["platform"]["id"]), "name": "Platform"},
+                               "planned_budget": 2000.0, "committed_cost": None, "used_cost_to_date": None,
+                               "percent_used": None, "over_budget": None, "hidden_reason": "below_min_group"}
     assert teams["Platform"]["yearly"] == 312000.0
 
 
-def test_small_groups_are_hidden_from_their_manager(api, world):
+def test_small_groups_are_hidden_from_their_manager(api, budgets):
+    world = budgets
     resp = api("GET", URL, as_=world["mia"])
     lake = by_name(resp.json["projects"])["Lake"]
     assert lake == {"id": str(world["lake"]["id"]), "name": "Lake",
                     "team": {"id": str(world["data"]["id"]), "name": "Data"},
-                    "planned": None, "used": None, "remaining": None, "percent_used": None,
-                    "hidden_reason": "below_min_group"}
+                    "planned_budget": 8000.0, "committed_cost": None, "used_cost_to_date": None,
+                    "percent_used": None, "over_budget": None, "hidden_reason": "below_min_group"}
     data = by_name(resp.json["teams"])["Data"]
     assert data["weekly"] is None and data["yearly"] is None and data["hidden_reason"] == "below_min_group"
     for amount in ("93600", "5250", "4500", "750"):

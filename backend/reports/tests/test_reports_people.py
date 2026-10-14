@@ -36,21 +36,21 @@ def test_at_risk_scope_and_roles(api, world):
     assert api("GET", f"{BASE}/at-risk-projects", as_=world["e1"]).status == 403
 
 
-def test_over_budget_is_for_admins_only(api, svc, world, monkeypatch):
-    from decimal import Decimal
-    real = svc.services._project_money
-
-    def overspent(project_ids, today):
-        money = real(project_ids, today)
-        for entry in money.values():
-            entry["used"] = entry["planned"] + Decimal(1)
-        return money
-
-    monkeypatch.setattr(svc.services, "_project_money", overspent)
+def test_over_budget_compares_committed_cost_with_the_planned_budget(api, world, migrated_db):
+    # Billing commits 11000; Lake commits 5250.
+    migrated_db.execute("UPDATE projects SET planned_budget = 10000 WHERE id = %s", (str(world["billing"]["id"]),))
+    migrated_db.execute("UPDATE projects SET planned_budget = 6000 WHERE id = %s", (str(world["lake"]["id"]),))
     admin_rows = by_name(api("GET", f"{BASE}/at-risk-projects", as_=world["admin"]).json["projects"])
-    assert "over_budget" in admin_rows["Billing"]["reasons"]
+    assert admin_rows["Billing"]["reasons"][-1] == "over_budget"
+    assert "over_budget" not in admin_rows["Lake"]["reasons"]
+    # Admin only: a manager never gets this reason.
     max_rows = by_name(api("GET", f"{BASE}/at-risk-projects", as_=world["max"]).json["projects"])
     assert "over_budget" not in max_rows["Billing"]["reasons"]
+
+
+def test_no_planned_budget_means_no_over_budget_reason(api, world):
+    rows = by_name(api("GET", f"{BASE}/at-risk-projects", as_=world["admin"]).json["projects"])
+    assert all("over_budget" not in r["reasons"] for r in rows.values())
 
 
 # =====================================================================
