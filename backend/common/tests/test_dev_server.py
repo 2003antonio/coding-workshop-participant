@@ -53,6 +53,7 @@ def test_only_real_services_can_be_loaded(name):
     ("/api/teams/abc/members/def", "teams"),
     ("/api/projects/abc/deliverables/def/dependencies", "projects"),
     ("/api/allocations/abc/archive", "allocations"),
+    ("/api/reports/budget", "reports"),
     ("/api/authors/x", None),
     ("/api/nope", None),
     ("/login", None),
@@ -98,8 +99,10 @@ def test_one_server_routes_to_every_service_by_url(server):
     assert status == 401 and body["error"]["code"] == "unauthorized"
     status, _, body = _request(server, "GET", "/api/employees/")
     assert status == 401 and body["error"]["code"] == "unauthorized"
-    for name in dev_server.SERVICE_NAMES[2:]:
-        status, _, body = _request(server, "GET", f"/api/{name}/")
+    for name, path in (("teams", "/"), ("projects", "/"), ("allocations", "/"),
+                       ("reports", "/budget")):
+        assert name in dev_server.SERVICE_NAMES
+        status, _, body = _request(server, "GET", f"/api/{name}{path}")
         assert status == 401, name
     status, _, body = _request(server, "GET", "/api/nope/")
     assert status == 404 and body["error"]["code"] == "not_found"

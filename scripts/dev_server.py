@@ -35,7 +35,7 @@ from service_loader import load_service  # noqa: E402
 from common import db  # noqa: E402
 
 PORT = 3001
-SERVICE_NAMES = ("auth", "employees", "teams", "projects", "allocations")
+SERVICE_NAMES = ("auth", "employees", "teams", "projects", "allocations", "reports")
 # The React dev server: Vite's default port, and the port in frontend/vite.config.js.
 ALLOWED_ORIGINS = frozenset({"http://localhost:5173", "http://localhost:3000"})
 ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
