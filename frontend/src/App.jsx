@@ -6,6 +6,7 @@ import ProtectedRoute from './auth/ProtectedRoute'
 import EmployeesPage from './pages/EmployeesPage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
+import ProjectDetailPage from './pages/ProjectDetailPage'
 import ProjectsPage from './pages/ProjectsPage'
 import TeamDetailPage from './pages/TeamDetailPage'
 import TeamsPage from './pages/TeamsPage'
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/teams/:id" element={<TeamDetailPage />} />
           </Route>
