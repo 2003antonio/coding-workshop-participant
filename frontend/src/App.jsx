@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import ProjectsPage from './pages/ProjectsPage'
+import ReportsPage from './pages/ReportsPage'
 import TeamDetailPage from './pages/TeamDetailPage'
 import TeamsPage from './pages/TeamsPage'
 import theme from './theme'
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/teams/:id" element={<TeamDetailPage />} />
           </Route>
