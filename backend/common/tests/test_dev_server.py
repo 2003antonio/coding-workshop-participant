@@ -51,6 +51,7 @@ def test_only_real_services_can_be_loaded(name):
     ("/api/employees/", "employees"),
     ("/api/employees/abc/archive", "employees"),
     ("/api/teams/abc/members/def", "teams"),
+    ("/api/projects/abc/deliverables/def/dependencies", "projects"),
     ("/api/authors/x", None),
     ("/api/nope", None),
     ("/login", None),
