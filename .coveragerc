@@ -1,5 +1,13 @@
-# Coverage counts real code only: not tests, not the per-service common/ copies.
+# Coverage counts real code only: not tests, not the per-service common/ copies,
+# and not the third-party packages bin/start-dev.sh installs into each service
+# folder with `pip install --target` (PyJWT, pg8000 and their dependencies).
 [run]
 omit =
     */tests/*
     backend/*/common/*
+    backend/*/jwt/*
+    backend/*/pg8000/*
+    backend/*/scramp/*
+    backend/*/asn1crypto/*
+    backend/*/dateutil/*
+    backend/*/six.py
