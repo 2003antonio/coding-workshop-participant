@@ -31,6 +31,7 @@ function initialValues(employee) {
     role: employee?.role ?? 'employee',
     salary: employee?.salary === undefined ? '' : String(employee.salary),
     password: '',
+    team_id: employee?.team_id ?? '',
   }
 }
 
@@ -58,12 +59,15 @@ function validate(values, isCreate) {
 }
 
 /**
- * Create or edit one employee. onSubmit(payload) must return a promise; if it
- * rejects, the dialog stays open and shows a friendly message.
+ * Create or edit one employee. onSubmit(payload, teamId) must return a promise;
+ * if it rejects, the dialog stays open and shows a friendly message.
  *   create payload: { name, email, job_title, role, salary, password }
  *   edit payload:   { name, job_title, role, salary }
+ *   teamId: the chosen team, or null for none. Team membership is not part of
+ *   the employee record: the caller changes it through /api/teams/{id}/members.
+ * `teams` are the active teams to offer; null if they could not be loaded.
  */
-export default function EmployeeFormDialog({ employee, onClose, onSubmit }) {
+export default function EmployeeFormDialog({ employee, teams = null, onClose, onSubmit }) {
   const isCreate = !employee
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const [values, setValues] = useState(() => initialValues(employee))
@@ -100,7 +104,7 @@ export default function EmployeeFormDialog({ employee, onClose, onSubmit }) {
     setServerError('')
     setSubmitting(true)
     try {
-      await onSubmit(payload)
+      await onSubmit(payload, values.team_id || null)
     } catch (error) {
       setServerError(messageFor(error))
       setSubmitting(false)
@@ -122,6 +126,14 @@ export default function EmployeeFormDialog({ employee, onClose, onSubmit }) {
             {ROLE_OPTIONS.map((option) => (
               <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
             ))}
+          </TextField>
+          <TextField select label="Team" {...field('team_id')} disabled={teams === null}
+            helperText={teams === null ? "Teams couldn't be loaded, so the team can't be changed now." : ' '}>
+            <MenuItem value="">No team</MenuItem>
+            {(teams ?? [])
+              // A lead is never a member of the team they lead.
+              .filter((team) => !employee || team.lead?.id !== employee.id)
+              .map((team) => <MenuItem key={team.id} value={team.id}>{team.name}</MenuItem>)}
           </TextField>
           <TextField label="Salary" required {...field('salary')}
             slotProps={{ htmlInput: { inputMode: 'decimal' } }} />

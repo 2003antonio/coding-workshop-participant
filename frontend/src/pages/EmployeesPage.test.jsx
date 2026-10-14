@@ -61,7 +61,7 @@ describe('Employees page: what each role sees', () => {
     renderApp('/employees')
 
     await table()
-    expect(columnHeaders()).toEqual(['Name', 'Email', 'Job title', 'Role', 'Salary', 'Actions'])
+    expect(columnHeaders()).toEqual(['Name', 'Email', 'Job title', 'Team', 'Role', 'Salary', 'Actions'])
     expect(within(rowFor('Eve Employee')).getByText('90,000.50')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add employee' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit Eve Employee' })).toBeEnabled()
@@ -85,7 +85,7 @@ describe('Employees page: what each role sees', () => {
     renderApp('/employees')
 
     await table()
-    expect(columnHeaders()).toEqual(['Name', 'Email', 'Job title', 'Role'])
+    expect(columnHeaders()).toEqual(['Name', 'Email', 'Job title', 'Team', 'Role'])
     expect(screen.getAllByRole('row')).toHaveLength(4) // header + 3 people
     expect(screen.queryByText(/90,000|150,000/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add employee|edit|archive/i })).not.toBeInTheDocument()

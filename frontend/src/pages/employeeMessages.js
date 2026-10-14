@@ -7,6 +7,7 @@ const BY_CODE = {
   cannot_archive_self: "You can't archive your own account.",
   already_archived: 'That employee is already archived.',
   archived: "Archived employees can't be changed.",
+  leads_team: 'This person leads a team. Choose a new lead for that team first.',
 }
 
 export const EMPLOYEE_MESSAGES = {
