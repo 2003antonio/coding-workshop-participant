@@ -2,8 +2,10 @@
 
 Turns each HTTP request into a Lambda Function URL-shaped event and calls
 backend/auth/function.py's handler, with CORS for the React dev server.
-Binds to 127.0.0.1 only. Single-threaded on purpose: one request at a time,
-like a Lambda. Uses backend/common directly, so no sync step is needed.
+Binds to 127.0.0.1 only. One thread per connection, so a browser's idle
+pre-opened sockets cannot block real requests; each request uses its own DB
+connection, closed when it finishes (like separate Lambda instances).
+Uses backend/common directly, so no sync step is needed.
 Shares port 3001 with bin/proxy-server.js: run one or the other.
 
 Usage (repo root):
@@ -14,7 +16,7 @@ import base64
 import logging
 import os
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +29,7 @@ from local_env import load_local_env  # noqa: E402
 load_local_env()
 
 import function  # noqa: E402  (imported after .env.local is loaded)
+from common import db  # noqa: E402
 
 PORT = 3001
 # The React dev server: Vite's default port, and the port in frontend/vite.config.js.
@@ -67,7 +70,10 @@ class _Handler(BaseHTTPRequestHandler):
             "body": body or None,
             "isBase64Encoded": is_b64,
         }
-        result = function.handler(event, None)
+        try:
+            result = function.handler(event, None)
+        finally:
+            db.close()  # this thread is done; do not leak its connection
         payload = (result.get("body") or "").encode("utf-8")
         self.send_response(result["statusCode"])
         for name, value in (result.get("headers") or {}).items():
@@ -89,7 +95,8 @@ class _Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    server = HTTPServer(("127.0.0.1", PORT), _Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
+    server.daemon_threads = True  # Ctrl+C never waits on idle browser connections
     print(f"Auth dev server on http://127.0.0.1:{PORT}/api/auth/  (Ctrl+C to stop)")
     try:
         server.serve_forever()
