@@ -20,5 +20,8 @@
 // Core routes are matched first, so a plug-in cannot change an existing
 // endpoint; to make one fail in a single test, use signedInAs(role, { routes }).
 
+import { crudRoutes } from './crud'
+
 export const extraRoutes = [
+  ...crudRoutes,
 ]

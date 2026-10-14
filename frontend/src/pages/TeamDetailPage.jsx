@@ -5,11 +5,11 @@ import Button from '@mui/material/Button'
 import Link from '@mui/material/Link'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import { useMediaQuery } from 'react-responsive'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { canManageTeams, canSeeTeamBudget } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
+import { useBreakpoint } from '../hooks/useBreakpoint'
 import AppShell from '../components/AppShell'
 import BudgetPanel from '../components/BudgetPanel'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -45,7 +45,7 @@ export default function TeamDetailPage() {
   const { id } = useParams()
   const { user, role } = useAuth()
   const api = useApi()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
+  const { isPhone } = useBreakpoint()
   const isAdmin = canManageTeams(role)
   const [notice, setNotice] = useState('')
   // null, { kind: 'edit' }, { kind: 'add' }, { kind: 'archive' } or { kind: 'remove', member }

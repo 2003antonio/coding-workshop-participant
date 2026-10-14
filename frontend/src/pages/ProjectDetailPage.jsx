@@ -8,11 +8,11 @@ import Paper from '@mui/material/Paper'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
-import { useMediaQuery } from 'react-responsive'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { canManageProject } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
+import { useBreakpoint } from '../hooks/useBreakpoint'
 import AllocationsSection from '../components/AllocationsSection'
 import AppShell from '../components/AppShell'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -31,7 +31,7 @@ export default function ProjectDetailPage() {
   const { id } = useParams()
   const { user, role } = useAuth()
   const api = useApi()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
+  const { isPhone } = useBreakpoint()
   const [tab, setTab] = useState('deliverables')
   const [archiving, setArchiving] = useState(false)
   const [editing, setEditing] = useState(false)
