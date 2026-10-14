@@ -146,7 +146,7 @@ describe('Assignment edit', () => {
     await retype(user, hours, '30')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
     expect(await within(dialog).findByText('This would put the person over 40 hours in some weeks.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16 (46 h)')).toBeInTheDocument()
+    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16, 2026 (46 h)')).toBeInTheDocument()
     expect(within(dialog).queryByText(/Data Lake/)).not.toBeInTheDocument()
 
     await retype(user, hours, '24')
