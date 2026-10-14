@@ -240,6 +240,10 @@ Thumbs.db
 # Frontend build artifacts and dependencies
 frontend/node_modules/
 
+# Playwright output (npm run e2e)
+frontend/test-results/
+frontend/playwright-report/
+
 # Keep package.json for participant setup
 !frontend/package.json
 !frontend/README.md
