@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { reply, signedInAs } from '../test/fakeApiServer'
+import { reply, seedData, signedInAs } from '../test/fakeApiServer'
 import { choose, headersOf, renderApp, rowFor } from '../test/renderApp'
 
 const tabs = () => screen.getAllByRole('tab').map((t) => t.textContent)
@@ -46,6 +46,15 @@ describe('Reports: content', () => {
     const reasons = within(list).getByRole('list', { name: 'Why Billing v2 is at risk' })
     expect(within(reasons).getAllByRole('listitem').map((li) => li.textContent))
       .toEqual(['Overdue deliverable', 'Blocked after its start date'])
+  })
+
+  it('at risk includes "over budget" for an admin when committed cost passes the planned budget', async () => {
+    const db = seedData()
+    db.projects.find((p) => p.id === 'p-1').planned_budget = 9000
+    signedInAs('admin', { db })
+    renderApp('/reports?report=risk')
+    const reasons = await screen.findByRole('list', { name: 'Why Billing v2 is at risk' })
+    expect(within(reasons).getByText('Over budget')).toBeInTheDocument()
   })
 
   it('at risk says so when nothing is at risk', async () => {
@@ -115,14 +124,29 @@ describe('Reports: content', () => {
     expect(reportCalls(server, 'dependency-chain').at(-1).query).toBe('?project_id=p-1')
   })
 
-  it('budget shows totals where allowed', async () => {
+  it('budget shows planned budget, committed, used to date, percent and the flag', async () => {
     signedInAs('manager')
     renderApp('/reports?report=budget')
     await screen.findByRole('table', { name: 'Project budgets' })
-    expect(within(rowFor('Billing v2')).getByText('9,977.73')).toBeInTheDocument()
-    expect(within(rowFor('Billing v2')).getByText('31%')).toBeInTheDocument()
+    expect(headersOf('Project budgets'))
+      .toEqual(['Project', 'Team', 'Planned budget', 'Committed', 'Used to date', 'Used %', 'Budget', 'Note'])
+    const cells = within(rowFor('Billing v2')).getAllByRole('cell').map((c) => c.textContent)
+    expect(cells).toEqual(['Platform', '12,000.00', '9,977.73', '3,090.78', '26%', 'Within budget', ''])
     const teams = screen.getByRole('table', { name: 'Team budgets' })
     expect(within(rowFor('Platform', teams)).getByText('246,000.50')).toBeInTheDocument()
+  })
+
+  it('budget flags a project whose committed cost is over its planned budget', async () => {
+    const db = seedData()
+    db.projects.find((p) => p.id === 'p-1').planned_budget = 9000
+    signedInAs('admin', { db })
+    renderApp('/reports?report=budget')
+    await screen.findByRole('table', { name: 'Project budgets' })
+    expect(within(rowFor('Billing v2')).getByText('Over budget')).toBeInTheDocument()
+    expect(within(rowFor('Billing v2')).getByText('34%')).toBeInTheDocument()
+    expect(within(rowFor('Data Lake')).getByText('Not set')).toBeInTheDocument()
+    expect(within(rowFor('Data Lake')).getByText('No planned budget')).toBeInTheDocument()
+    expect(within(rowFor('Data Lake')).getAllByRole('cell')[4]).toHaveTextContent('—') // no percent without a budget
   })
 
   it('budget explains hidden totals instead of showing numbers', async () => {
@@ -132,6 +156,7 @@ describe('Reports: content', () => {
     const row = rowFor('Data Lake')
     expect(within(row).getByText(/Totals are hidden because fewer than 3 people/)).toBeInTheDocument()
     expect(within(row).queryByText(/\d\.\d{2}/)).not.toBeInTheDocument()
+    expect(within(row).queryByText(/over budget|within budget/i)).not.toBeInTheDocument()
     const teams = screen.getByRole('table', { name: 'Team budgets' })
     expect(within(rowFor('Data', teams)).getByText(/Totals are hidden/)).toBeInTheDocument()
   })

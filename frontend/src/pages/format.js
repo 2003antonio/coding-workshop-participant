@@ -6,6 +6,9 @@ const day = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', y
 /** 52000 -> "52,000.00" (the API sends money as plain numbers, no currency). */
 export const formatMoney = (amount) => money.format(amount)
 
+/** 25.76 -> "26%"; null -> "—". */
+export const formatPercent = (value) => (value === null || value === undefined ? '—' : `${Math.round(value)}%`)
+
 /** "2026-11-02" -> "Nov 2, 2026". Dates are calendar days, so they are read as UTC. */
 export function formatDate(date) {
   if (!date) return '—'

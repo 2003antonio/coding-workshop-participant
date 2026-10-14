@@ -19,8 +19,10 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import DeliverablesSection from '../components/DeliverablesSection'
 import { LoadState } from '../components/PageState'
 import ProjectBudgetSection from '../components/ProjectBudgetSection'
+import ProjectFormDialog from '../components/ProjectFormDialog'
 import StatusChip from '../components/StatusChip'
 import * as projectService from '../services/projectService'
+import * as teamService from '../services/teamService'
 import { formatDate } from './format'
 
 /** One project: details, deliverables, people and (for its manager and admins) the budget. */
@@ -31,10 +33,28 @@ export default function ProjectDetailPage() {
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const [tab, setTab] = useState('deliverables')
   const [archiving, setArchiving] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [notice, setNotice] = useState('')
+  const [version, setVersion] = useState(0) // bumped after an edit so the open section reloads
 
   const load = useCallback((call) => call((token) => projectService.getProject(token, id)), [id])
   const result = useLoad(load)
+  // Only an admin may move a project to another team, so only an admin needs the team list.
+  const loadTeams = useCallback(
+    (call) => (role === 'admin' ? call((token) => teamService.listTeams(token)) : Promise.resolve(null)),
+    [role],
+  )
+  const teams = useLoad(loadTeams)
+
+  async function handleEdit(changes) {
+    if (Object.keys(changes).length) {
+      const updated = await api((token) => projectService.updateProject(token, id, changes))
+      setNotice(`${updated.name} was updated.`)
+      setVersion((v) => v + 1)
+      result.reload()
+    }
+    setEditing(false)
+  }
 
   async function handleArchive() {
     const archived = await api((token) => projectService.archiveProject(token, id))
@@ -71,7 +91,12 @@ export default function ProjectDetailPage() {
                   {project.description && <Typography sx={{ mt: 1 }}>{project.description}</Typography>}
                 </Box>
                 {canEdit && (
-                  <Button color="error" variant="outlined" onClick={() => setArchiving(true)}>Archive project</Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button variant="outlined" onClick={() => setEditing(true)} disabled={teams.status === 'loading'}>
+                      Edit project
+                    </Button>
+                    <Button color="error" variant="outlined" onClick={() => setArchiving(true)}>Archive project</Button>
+                  </Box>
                 )}
               </Box>
               {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
@@ -84,12 +109,16 @@ export default function ProjectDetailPage() {
                   ))}
                 </Tabs>
               </Paper>
-              <Box role="tabpanel" id={`panel-${current}`} aria-labelledby={`tab-${current}`}>
+              <Box key={version} role="tabpanel" id={`panel-${current}`} aria-labelledby={`tab-${current}`}>
                 {current === 'deliverables' && <DeliverablesSection project={project} canEdit={canEdit} />}
                 {current === 'people' && <AllocationsSection project={project} canEdit={canEdit} role={role} />}
                 {current === 'budget' && <ProjectBudgetSection project={project} role={role} />}
               </Box>
 
+              {editing && (
+                <ProjectFormDialog project={project} canChangeTeam={role === 'admin' && Boolean(teams.data)}
+                  teams={teams.data ?? [project.team]} onClose={() => setEditing(false)} onSubmit={handleEdit} />
+              )}
               {archiving && (
                 <ConfirmDialog title={`Archive ${project.name}?`}
                   description="Its deliverables and assignments are archived too. Nothing is deleted."

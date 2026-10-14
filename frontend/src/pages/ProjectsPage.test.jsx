@@ -150,6 +150,29 @@ describe('Projects list: actions', () => {
     })
   })
 
+  it('New project can carry an optional planned budget', async () => {
+    const server = signedInAs('admin')
+    const { user } = renderApp('/projects')
+    await projectsTable()
+    await user.click(screen.getByRole('button', { name: 'New project' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New project' })
+    await choose(user, /team/i, 'Data', dialog)
+    await user.type(within(dialog).getByRole('textbox', { name: /project name/i }), 'Warehouse')
+    await user.type(within(dialog).getByLabelText(/start date/i), '2027-01-04')
+    await user.type(within(dialog).getByLabelText(/end date/i), '2027-06-30')
+    await user.type(within(dialog).getByRole('textbox', { name: /planned budget/i }), '99999999999')
+    await user.click(within(dialog).getByRole('button', { name: 'Create project' }))
+    expect(within(dialog).getByText('Enter an amount up to 9,999,999,999.99.')).toBeInTheDocument()
+
+    await user.clear(within(dialog).getByRole('textbox', { name: /planned budget/i }))
+    await user.type(within(dialog).getByRole('textbox', { name: /planned budget/i }), '52000')
+    await user.click(within(dialog).getByRole('button', { name: 'Create project' }))
+    expect(await screen.findByRole('heading', { name: 'Warehouse' })).toBeInTheDocument()
+    expect(server.calls.find((c) => c.method === 'POST' && c.path === '/api/projects/').body).toMatchObject({
+      team_id: 't-2', name: 'Warehouse', planned_budget: 52000,
+    })
+  })
+
   it('a failed load shows a fixed message, never the server text', async () => {
     signedInAs('admin', {
       routes: { 'GET /api/projects/': () => reply(503, { error: { code: 'unavailable', message: 'raw: db down' } }) },

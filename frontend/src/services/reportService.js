@@ -34,7 +34,8 @@ export function dependencyChain(accessToken, { projectId, deliverableId } = {}) 
   return get('dependency-chain', accessToken, { project_id: projectId, deliverable_id: deliverableId })
 }
 
-/** 7. (admin, manager) -> { projects: [{ ..., planned, used, remaining, percent_used, hidden_reason }],
+/** 7. (admin, manager) -> { projects: [{ id, name, team, planned_budget, committed_cost,
+ *  used_cost_to_date, percent_used, over_budget, hidden_reason }],
  *  teams: [{ id, name, weekly, yearly, hidden_reason }] } */
 export function budgetReport(accessToken, { teamId } = {}) {
   return get('budget', accessToken, { team_id: teamId })

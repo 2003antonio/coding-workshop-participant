@@ -9,7 +9,8 @@ export function getTeamBudget(accessToken, teamId) {
 }
 
 /** GET /api/projects/{id}/budget ->
- *  { project_id, planned, used, remaining, allocated_people, hidden_reason, lines? } */
+ *  { project_id, planned_budget, committed_cost, used_cost_to_date, percent_used, over_budget,
+ *    allocated_people, hidden_reason, lines? } */
 export function getProjectBudget(accessToken, projectId) {
   return request(`/projects/${seg(projectId)}/budget`, accessToken)
 }

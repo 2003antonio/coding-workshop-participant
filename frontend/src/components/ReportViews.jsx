@@ -16,7 +16,8 @@ import { Link as RouterLink } from 'react-router-dom'
 import { useLoad } from '../auth/useApi'
 import * as projectService from '../services/projectService'
 import * as reportService from '../services/reportService'
-import { RISK_REASONS, formatDate, formatMoney, hiddenMessage } from '../pages/format'
+import { RISK_REASONS, formatDate, formatMoney, formatPercent, hiddenMessage } from '../pages/format'
+import BudgetFlag from './BudgetFlag'
 import { Empty, LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
@@ -240,7 +241,11 @@ export function ChainReport() {
   )
 }
 
-/** 7. Budget used vs planned, per project and per team. Hidden totals say why. */
+/**
+ * 7. Budget used vs planned: per project the planned budget, committed cost,
+ * used to date, percent used and over-budget flag; per team the salary totals.
+ * Hidden totals say why.
+ */
 export function BudgetReport() {
   const load = useCallback((call) => call((token) => reportService.budgetReport(token)), [])
   const result = useLoad(load)
@@ -255,11 +260,14 @@ export function BudgetReport() {
               columns={[
                 { key: 'name', label: 'Project', primary: true, render: projectLink },
                 { key: 'team', label: 'Team', render: (p) => p.team?.name },
-                { key: 'planned', label: 'Planned', align: 'right', render: (p) => money(p.planned) },
-                { key: 'used', label: 'Used', align: 'right', render: (p) => money(p.used) },
-                { key: 'remaining', label: 'Remaining', align: 'right', render: (p) => money(p.remaining) },
-                { key: 'percent', label: 'Used %', align: 'right',
-                  render: (p) => (p.percent_used === null ? '—' : `${Math.round(p.percent_used)}%`) },
+                { key: 'budget', label: 'Planned budget', align: 'right',
+                  render: (p) => (p.planned_budget === null ? 'Not set' : money(p.planned_budget)) },
+                { key: 'committed', label: 'Committed', align: 'right', render: (p) => money(p.committed_cost) },
+                { key: 'used', label: 'Used to date', align: 'right', render: (p) => money(p.used_cost_to_date) },
+                { key: 'percent', label: 'Used %', align: 'right', render: (p) => formatPercent(p.percent_used) },
+                { key: 'flag', label: 'Budget', render: (p) => (p.hidden_reason ? '—' : (
+                  <BudgetFlag plannedBudget={p.planned_budget} overBudget={p.over_budget} />
+                )) },
                 { key: 'note', label: 'Note', render: note },
               ]} />
           </Box>

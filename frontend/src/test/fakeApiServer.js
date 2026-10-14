@@ -39,11 +39,11 @@ export function seedData() {
     ],
     projects: [
       { id: 'p-1', team_id: 't-1', name: 'Billing v2', description: 'New invoices', status: 'active',
-        start_date: '2026-11-02', end_date: '2027-03-31', archived_at: null },
+        start_date: '2026-11-02', end_date: '2027-03-31', planned_budget: 12000, archived_at: null },
       { id: 'p-2', team_id: 't-2', name: 'Data Lake', description: '', status: 'planned',
-        start_date: '2026-11-02', end_date: '2027-02-26', archived_at: null },
+        start_date: '2026-11-02', end_date: '2027-02-26', planned_budget: null, archived_at: null },
       { id: 'p-3', team_id: 't-1', name: 'Old Portal', description: '', status: 'completed',
-        start_date: '2026-01-05', end_date: '2026-06-30', archived_at: '2026-07-01T09:00:00+00:00' },
+        start_date: '2026-01-05', end_date: '2026-06-30', planned_budget: null, archived_at: '2026-07-01T09:00:00+00:00' },
     ],
     deliverables: [
       { id: 'd-1', project_id: 'p-1', name: 'API spec', description: '', start_date: '2026-11-02',
@@ -135,11 +135,13 @@ function createApi(db, meId, today) {
   })
   function projectView(project) {
     const team = byId('teams', project.team_id)
-    return {
+    const view = {
       id: project.id, team: ref(team), manager: ref(byId('employees', team.lead_id)),
       name: project.name, description: project.description, status: project.status,
       start_date: project.start_date, end_date: project.end_date, archived_at: project.archived_at,
     }
+    // The typed budget goes to the people who may set it: admin and the project's manager.
+    return canManageProject(project) ? { ...view, planned_budget: project.planned_budget ?? null } : view
   }
   function deliverableView(d) {
     const deps = d.depends_on.map((id) => byId('deliverables', id))
@@ -171,23 +173,44 @@ function createApi(db, meId, today) {
     const rate = salaryOf(a.employee_id) / 2080
     const weeks = weeksTouched(a.start_date, a.end_date)
     const usedWeeks = weeks.filter((w) => w <= thisWeek).length
-    return { rate, weeks: weeks.length, planned: rate * a.hours_per_week * weeks.length, used: rate * a.hours_per_week * usedWeeks }
+    return {
+      rate, weeks: weeks.length,
+      committed: rate * a.hours_per_week * weeks.length, used: rate * a.hours_per_week * usedWeeks,
+    }
   }
+  /**
+   * planned_budget: typed by admin or the manager (null = not set). It is not
+   * derived from pay, so it is never hidden. The rest is computed from the
+   * assignments and hidden from non-admins below MIN_AGGREGATE_GROUP people:
+   *   committed_cost    = cost of every assignment over its whole range
+   *   used_cost_to_date = cost of the weeks up to and including this one
+   *   percent_used      = used_cost_to_date / planned_budget × 100 (null without a budget)
+   *   over_budget       = committed_cost > planned_budget (false without a budget)
+   */
   function projectMoney(project) {
     const rows = db.allocations.filter((a) => active(a) && a.project_id === project.id)
     const people = new Set(rows.map((a) => a.employee_id)).size
     const costs = rows.map((a) => ({ a, ...allocationCost(a) }))
-    const planned = costs.reduce((s, c) => s + c.planned, 0)
+    const committed = costs.reduce((s, c) => s + c.committed, 0)
     const used = costs.reduce((s, c) => s + c.used, 0)
+    const budget = project.planned_budget ?? null
     const hidden = !isAdmin() && people < MIN_AGGREGATE_GROUP
     return {
       costs, people, hidden,
-      planned: hidden ? null : round2(planned),
-      used: hidden ? null : round2(used),
-      remaining: hidden ? null : round2(planned - used),
-      percent_used: hidden ? null : (planned ? round2((used / planned) * 100) : 0),
+      planned_budget: budget,
+      committed_cost: hidden ? null : round2(committed),
+      used_cost_to_date: hidden ? null : round2(used),
+      percent_used: hidden || !budget ? null : round2((used / budget) * 100),
+      over_budget: hidden ? null : budget !== null && round2(committed) > budget,
       hidden_reason: hidden ? 'below_min_group' : null,
     }
+  }
+  const MONEY_FIELDS = ['planned_budget', 'committed_cost', 'used_cost_to_date', 'percent_used', 'over_budget', 'hidden_reason']
+  const moneyFields = (money) => Object.fromEntries(MONEY_FIELDS.map((k) => [k, money[k]]))
+  function badBudget(value) {
+    if (value === undefined || value === null) return false
+    return typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 9999999999.99
+      || Math.round(value * 100) !== value * 100
   }
   function teamMoney(team) {
     const list = members(team.id)
@@ -250,7 +273,7 @@ function createApi(db, meId, today) {
 
   const ALLOWED = {
     team: ['name', 'lead_id'],
-    project: ['team_id', 'name', 'description', 'status', 'start_date', 'end_date'],
+    project: ['team_id', 'name', 'description', 'status', 'start_date', 'end_date', 'planned_budget'],
     deliverable: ['name', 'description', 'start_date', 'due_date', 'status', 'depends_on'],
     allocation: ['employee_id', 'project_id', 'hours_per_week', 'start_date', 'end_date'],
   }
@@ -382,9 +405,27 @@ function createApi(db, meId, today) {
       if (!team || !active(team)) return err(400, 'invalid_team')
       if (!canManageProject({ team_id: team.id })) return forbidden()
       if (!body.start_date || !body.end_date || body.start_date > body.end_date) return err(400, 'invalid_dates')
-      const project = { id: `p-${nextId++}`, description: '', status: 'planned', ...body, archived_at: null }
+      if (badBudget(body.planned_budget)) return err(400, 'bad_request')
+      const project = {
+        id: `p-${nextId++}`, description: '', status: 'planned', planned_budget: null, ...body, archived_at: null,
+      }
       db.projects.push(project)
       return reply(201, projectView(project))
+    }],
+    ['PUT', /^\/api\/projects\/(?<id>[^/]+)$/, ({ body, params }) => {
+      const project = visibleProject(params.id)
+      if (!project) return notFound()
+      if (!canManageProject(project)) return forbidden()
+      if (project.archived_at) return err(409, 'archived')
+      if (unknownField(body, 'project') || (body.name !== undefined && !body.name.trim())) return err(400, 'bad_request')
+      if (body.team_id !== undefined && !isAdmin()) return forbidden()
+      if (badBudget(body.planned_budget)) return err(400, 'bad_request')
+      const next = { ...project, ...body }
+      if (next.start_date > next.end_date) return err(400, 'invalid_dates')
+      if (body.status === 'completed' && db.deliverables.some((d) => active(d) && d.project_id === project.id
+        && d.status !== 'done')) return err(409, 'deliverables_open')
+      Object.assign(project, body)
+      return reply(200, projectView(project))
     }],
     ['POST', /^\/api\/projects\/(?<id>[^/]+)\/archive$/, ({ params }) => {
       const project = visibleProject(params.id)
@@ -399,14 +440,11 @@ function createApi(db, meId, today) {
       if (!project) return notFound()
       if (!canManageProject(project)) return forbidden()
       const money = projectMoney(project)
-      const body = {
-        project_id: project.id, planned: money.planned, used: money.used, remaining: money.remaining,
-        allocated_people: money.people, hidden_reason: money.hidden_reason,
-      }
+      const body = { project_id: project.id, ...moneyFields(money), allocated_people: money.people }
       if (isAdmin()) {
         body.lines = money.costs.map((c) => ({
           allocation_id: c.a.id, employee: ref(byId('employees', c.a.employee_id)), hours_per_week: c.a.hours_per_week,
-          weeks: c.weeks, hourly_rate: round2(c.rate), planned: round2(c.planned), used: round2(c.used),
+          weeks: c.weeks, hourly_rate: round2(c.rate), committed_cost: round2(c.committed), used_cost_to_date: round2(c.used),
         }))
       }
       return reply(200, body)
@@ -537,8 +575,7 @@ function createApi(db, meId, today) {
         if (p.status === 'active' && !db.allocations.some((a) => active(a) && a.project_id === p.id
           && mondayOf(a.start_date) <= thisWeek && a.end_date >= thisWeek)) reasons.push('unstaffed')
         if (isAdmin()) {
-          const money = projectMoney(p)
-          if (money.used > money.planned) reasons.push('over_budget')
+          if (projectMoney(p).over_budget) reasons.push('over_budget')
         }
         const { id, name, team, manager } = projectView(p)
         return { id, name, team, manager, reasons }
@@ -617,8 +654,7 @@ function createApi(db, meId, today) {
       const teams = db.teams.filter((t) => active(t) && canSeeTeam(t) && (!teamId || t.id === teamId))
       return reply(200, {
         projects: projects.map((p) => {
-          const { planned, used, remaining, percent_used, hidden_reason } = projectMoney(p)
-          return { id: p.id, name: p.name, team: ref(byId('teams', p.team_id)), planned, used, remaining, percent_used, hidden_reason }
+          return { id: p.id, name: p.name, team: ref(byId('teams', p.team_id)), ...moneyFields(projectMoney(p)) }
         }),
         teams: teams.map((t) => {
           const { weekly, yearly, hidden_reason } = teamMoney(t)

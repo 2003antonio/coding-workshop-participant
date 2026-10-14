@@ -17,12 +17,14 @@ export function getProject(accessToken, id) {
   return request(project(id), accessToken)
 }
 
-/** POST / -> the created project. fields: { team_id, name, description?, status?, start_date, end_date } */
+/** POST / -> the created project.
+ *  fields: { team_id, name, description?, status?, start_date, end_date, planned_budget? } */
 export function createProject(accessToken, fields) {
   return request('/projects/', accessToken, { method: 'POST', body: fields })
 }
 
-/** PUT /{id} -> the updated project */
+/** PUT /{id} -> the updated project. changes: any of name, description, status, start_date,
+ *  end_date, planned_budget (null clears it); team_id admin only */
 export function updateProject(accessToken, id, changes) {
   return request(project(id), accessToken, { method: 'PUT', body: changes })
 }

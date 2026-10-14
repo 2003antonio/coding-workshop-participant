@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { reply, signedInAs } from '../test/fakeApiServer'
+import { reply, seedData, signedInAs } from '../test/fakeApiServer'
 import { choose, headersOf, renderApp, rowFor } from '../test/renderApp'
 
 const deliverablesTable = () => screen.findByRole('table', { name: 'Deliverables' })
@@ -31,7 +31,8 @@ describe('Project detail: header and tabs', () => {
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People'])
     expect(headersOf('Deliverables')).toEqual(['Deliverable', 'Dates', 'Status', 'Depends on'])
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /add deliverable|archive project|dependencies/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add deliverable|edit project|archive project|dependencies/i }))
+      .not.toBeInTheDocument()
 
     await openTab(user, 'People')
     await screen.findByRole('table', { name: 'Assignments' })
@@ -223,16 +224,20 @@ describe('Project detail: people', () => {
 })
 
 describe('Project detail: budget', () => {
-  it('admin sees totals and the cost per assignment with hourly rates', async () => {
+  // Billing v2: planned budget 12,000; committed 9,977.73; used to date 3,090.78 (26% of the budget).
+  it('admin sees the planned budget, costs, percent used, the flag and the cost per assignment', async () => {
     signedInAs('admin')
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'Budget')
     const panel = await screen.findByRole('region', { name: 'Project budget' })
-    expect(within(panel).getByText('9,977.73')).toBeInTheDocument() // planned
-    expect(within(panel).getByText('3,090.78')).toBeInTheDocument() // used up to this week
-    expect(within(panel).getByText('6,886.95')).toBeInTheDocument() // remaining
+    const figure = (label) => within(panel).getByText(label, { selector: 'dt' }).nextElementSibling
+    expect(figure('Planned budget')).toHaveTextContent('12,000.00')
+    expect(figure('Committed cost')).toHaveTextContent('9,977.73')
+    expect(figure('Used to date')).toHaveTextContent('3,090.78')
+    expect(figure('Percent used')).toHaveTextContent('26%')
+    expect(within(panel).getByText('Within budget')).toBeInTheDocument()
     expect(headersOf('Cost per assignment'))
-      .toEqual(['Person', 'Hours per week', 'Weeks', 'Hourly rate', 'Planned', 'Used'])
+      .toEqual(['Person', 'Hours per week', 'Weeks', 'Hourly rate', 'Committed', 'Used to date'])
     expect(within(rowFor('Bo Builder')).getByText('40.00')).toBeInTheDocument()
   })
 
@@ -241,9 +246,21 @@ describe('Project detail: budget', () => {
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'Budget')
     const panel = await screen.findByRole('region', { name: 'Project budget' })
+    expect(within(panel).getByText('12,000.00')).toBeInTheDocument()
     expect(within(panel).getByText('9,977.73')).toBeInTheDocument()
     expect(within(panel).getByText(/3 people assigned/)).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Cost per assignment' })).not.toBeInTheDocument()
+  })
+
+  it('without a planned budget it says so, with no percent and no flag either way', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/projects/p-2')
+    await openTab(user, 'Budget')
+    const panel = await screen.findByRole('region', { name: 'Project budget' })
+    expect(within(panel).getByText('Planned budget').nextElementSibling).toHaveTextContent('Not set')
+    expect(within(panel).queryByText('Percent used')).not.toBeInTheDocument()
+    expect(within(panel).getByText('No planned budget')).toBeInTheDocument()
+    expect(within(panel).queryByText(/over budget|within budget/i)).not.toBeInTheDocument()
   })
 
   it('below 3 people the manager sees why the totals are hidden, and no number', async () => {
@@ -258,6 +275,19 @@ describe('Project detail: budget', () => {
     expect(within(panel).getByText(/2 people assigned/)).toBeInTheDocument()
   })
 
+  it('below 3 people a typed planned budget still shows, but costs, percent and flag stay hidden', async () => {
+    const db = seedData()
+    db.projects.find((p) => p.id === 'p-2').planned_budget = 50000
+    signedInAs('u-6', { db })
+    const { user } = renderApp('/projects/p-2')
+    await openTab(user, 'Budget')
+    const panel = await screen.findByRole('region', { name: 'Project budget' })
+    expect(within(panel).getByText('Planned budget').nextElementSibling).toHaveTextContent('50,000.00')
+    expect(within(panel).getByText(/Totals are hidden because fewer than 3 people/)).toBeInTheDocument()
+    expect(within(panel).queryByText(/committed|used to date|percent used/i, { selector: 'dt' })).not.toBeInTheDocument()
+    expect(within(panel).queryByText(/over budget|within budget/i)).not.toBeInTheDocument()
+  })
+
   it('a budget error shows a fixed message', async () => {
     signedInAs('manager', {
       routes: { 'GET /api/projects/p-1/budget': () => reply(500, { error: { code: 'x', message: 'raw salary 90000' } }) },
@@ -266,6 +296,83 @@ describe('Project detail: budget', () => {
     await openTab(user, 'Budget')
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
     expect(screen.queryByText(/90000/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Project detail: edit and planned budget', () => {
+  it('the manager lowers the planned budget below the committed cost and the panel flags it', async () => {
+    const server = signedInAs('manager')
+    const { user } = renderApp('/projects/p-1')
+    await openTab(user, 'Budget')
+    await screen.findByText('Within budget')
+
+    await user.click(screen.getByRole('button', { name: 'Edit project' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Billing v2' })
+    // A manager cannot move the project to another team.
+    expect(within(dialog).getByRole('combobox', { name: /team/i })).toHaveAttribute('aria-disabled', 'true')
+    const budget = within(dialog).getByRole('textbox', { name: /planned budget/i })
+    expect(budget).toHaveValue('12000')
+    await user.clear(budget)
+    await user.type(budget, '5000.5x')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(within(dialog).getByText('Enter an amount like 52000 or 52000.50.')).toBeInTheDocument()
+    expect(server.count('PUT', '/api/projects/p-1')).toBe(0)
+
+    await user.clear(budget)
+    await user.type(budget, '5,000.50')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Billing v2 was updated.')).toBeInTheDocument()
+    expect(server.calls.find((c) => c.method === 'PUT' && c.path === '/api/projects/p-1').body)
+      .toEqual({ planned_budget: 5000.5 })
+    const panel = await screen.findByRole('region', { name: 'Project budget' })
+    expect(await within(panel).findByText('Over budget')).toBeInTheDocument()
+    expect(within(panel).getByText('Planned budget').nextElementSibling).toHaveTextContent('5,000.50')
+    expect(within(panel).getByText('Percent used').nextElementSibling).toHaveTextContent('62%')
+  })
+
+  it('clearing the planned budget sends null; other edits send only what changed', async () => {
+    const server = signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    await user.click(await screen.findByRole('button', { name: 'Edit project' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Billing v2' })
+    expect(within(dialog).getByRole('combobox', { name: /team/i })).not.toHaveAttribute('aria-disabled')
+    await user.clear(within(dialog).getByRole('textbox', { name: /planned budget/i }))
+    await choose(user, /status/i, 'On hold', dialog)
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Billing v2 was updated.')).toBeInTheDocument()
+    expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ status: 'on_hold', planned_budget: null })
+    expect(await screen.findByText('On hold')).toBeInTheDocument()
+  })
+
+  it('saving with no changes sends nothing', async () => {
+    const server = signedInAs('manager')
+    const { user } = renderApp('/projects/p-1')
+    await user.click(await screen.findByRole('button', { name: 'Edit project' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Billing v2' })
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(server.count('PUT', '/api/projects/p-1')).toBe(0)
+  })
+
+  it('a refused edit keeps the dialog open with a fixed message', async () => {
+    signedInAs('manager')
+    const { user } = renderApp('/projects/p-1')
+    await user.click(await screen.findByRole('button', { name: 'Edit project' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Billing v2' })
+    await choose(user, /status/i, 'Completed', dialog)
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await within(dialog).findByText('Finish every deliverable before marking the project completed.'))
+      .toBeInTheDocument()
+  })
+
+  it('an employee gets no planned budget and no Edit button', async () => {
+    signedInAs('employee')
+    renderApp('/projects/p-1')
+    await screen.findByRole('heading', { name: 'Billing v2' })
+    expect(screen.queryByRole('button', { name: 'Edit project' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/12,000|planned budget/i)).not.toBeInTheDocument()
   })
 })
 
@@ -280,9 +387,10 @@ describe('salary data never reaches a non-admin screen', () => {
       }],
     }),
     'GET /api/projects/p-1/budget': () => reply(200, {
-      project_id: 'p-1', planned: 9977.73, used: 3090.78, remaining: 6886.95, allocated_people: 3, hidden_reason: null,
+      project_id: 'p-1', planned_budget: 12000, committed_cost: 9977.73, used_cost_to_date: 3090.78,
+      percent_used: 25.76, over_budget: false, allocated_people: 3, hidden_reason: null,
       lines: [{ allocation_id: 'a-1', employee: { id: 'u-3', name: 'Eve Employee' }, hours_per_week: 20, weeks: 7,
-        hourly_rate: 43.27, planned: 6057.73, used: 1730.78 }],
+        hourly_rate: 43.27, committed_cost: 6057.73, used_cost_to_date: 1730.78 }],
     }),
   }
 
