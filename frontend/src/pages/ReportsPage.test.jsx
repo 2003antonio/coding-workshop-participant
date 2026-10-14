@@ -65,7 +65,7 @@ describe('Reports: content', () => {
 
   it('resources shows a week grid; hours on hidden projects are not named', async () => {
     signedInAs('manager')
-    renderApp('/reports?report=resources')
+    const { user } = renderApp('/reports?report=resources')
     await screen.findByRole('table', { name: 'Resource allocation' })
     const headers = headersOf('Resource allocation')
     expect(headers.slice(0, 3)).toEqual(['Person', 'Nov 9 ’26', 'Nov 16 ’26'])
@@ -73,7 +73,11 @@ describe('Reports: content', () => {
     expect(screen.getAllByRole('rowheader').map((r) => r.textContent)).toEqual(['Eve Employee', 'Bo Builder', 'Cy Coder'])
     const eveWeek2 = within(rowFor('Eve Employee')).getAllByRole('cell')[1]
     expect(eveWeek2).toHaveTextContent('36 h')
-    expect(eveWeek2.querySelector('span')).toHaveAttribute('title', 'Billing v2: 20 h, Elsewhere: 16 h')
+    // The breakdown moved from a title attribute to a tooltip on hover and focus (heat-map, slice 8).
+    await user.hover(eveWeek2)
+    const tip = await screen.findByRole('tooltip')
+    expect(tip).toHaveTextContent('Billing v2: 20 h')
+    expect(tip).toHaveTextContent('Other projects: 16 h')
     expect(screen.queryByText(/Data Lake/)).not.toBeInTheDocument()
   })
 

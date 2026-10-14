@@ -2,6 +2,7 @@
 // and shows loading, empty and error states. Money follows the hiding rule.
 import { useCallback, useState } from 'react'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import LinearProgress from '@mui/material/LinearProgress'
@@ -19,7 +20,10 @@ import * as reportService from '../services/reportService'
 import {
   RISK_REASONS, formatDate, formatMoney, formatPercent, formatWeek, formatWeekShort, hiddenMessage,
 } from '../pages/format'
+import { useBreakpoint } from '../hooks/useBreakpoint'
 import BudgetFlag from './BudgetFlag'
+import CapacityHeatmap, { HeatLegend } from './heatmap/CapacityHeatmap'
+import { shiftWeek } from './heatmap/heatScale'
 import { Empty, LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
@@ -28,6 +32,7 @@ const projectLink = (p) => <Link component={RouterLink} to={`/projects/${encodeU
 const money = (amount) => (amount === null || amount === undefined ? '—' : formatMoney(amount))
 const DEFAULT_THRESHOLD = 32
 const PICK_PROJECT = 'Choose a project to see its dependency chain.'
+const RESOURCE_WEEKS = 12 // the server's default window (§8)
 
 /** 1. Project status: progress and deliverable counts per project. */
 export function ProjectStatusReport() {
@@ -87,31 +92,40 @@ export function AtRiskReport() {
 
 /** 3. Resource allocation: hours per person per week (other teams' projects are not named). */
 export function ResourcesReport() {
-  const load = useCallback((call) => call((token) => reportService.resourceAllocation(token)), [])
+  const { isPhone } = useBreakpoint()
+  const [from, setFrom] = useState(null) // null: the server's default window (this week + 11)
+  const load = useCallback(
+    (call) => call((token) => reportService.resourceAllocation(token, { from: from ?? undefined })),
+    [from],
+  )
   const result = useLoad(load)
+  const first = result.data?.weeks?.[0]
+  const span = result.data?.weeks?.length || RESOURCE_WEEKS
   return (
-    <LoadState result={result} label="Loading resource allocation" skeleton="table">
-      {(data) => (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Hours per week, from the {formatWeek(data.weeks[0])}. “Elsewhere” is time on projects you can’t see.
-          </Typography>
-          <ResponsiveTable label="Resource allocation" rows={data.people} empty="No one to show."
-            columns={[
-              { key: 'name', label: 'Person', primary: true, render: (p) => p.name },
-              ...data.weeks.map((week, i) => ({
-                key: week, label: formatWeekShort(week), align: 'right', render: (p) => {
-                  const w = p.weeks[i]
-                  if (!w || w.total_hours === 0) return '—'
-                  const names = w.projects.map((x) => `${x.name}: ${x.hours} h`)
-                  if (w.other_hours) names.push(`Elsewhere: ${w.other_hours} h`)
-                  return <span title={names.join(', ')}>{w.total_hours} h</span>
-                },
-              })),
-            ]} />
-        </>
-      )}
-    </LoadState>
+    <>
+      <Box component="nav" aria-label="Weeks shown" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 }}>
+        <Button size="small" variant="outlined" sx={{ minHeight: 44 }} disabled={!first}
+          onClick={() => setFrom(shiftWeek(first, -span))}>
+          Previous {span} weeks
+        </Button>
+        <Button size="small" variant="outlined" sx={{ minHeight: 44 }} disabled={!first}
+          onClick={() => setFrom(shiftWeek(first, span))}>
+          Next {span} weeks
+        </Button>
+        {from && <Button size="small" sx={{ minHeight: 44 }} onClick={() => setFrom(null)}>This week</Button>}
+      </Box>
+      <LoadState result={result} label="Loading resource allocation" skeleton="table">
+        {(data) => (data.people.length === 0 ? <Empty>No one to show.</Empty> : (
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Hours per week, from the {formatWeek(first)}. “Other projects” is time on projects you can’t see.
+            </Typography>
+            <CapacityHeatmap weeks={data.weeks} people={data.people} isPhone={isPhone} />
+            <HeatLegend />
+          </>
+        ))}
+      </LoadState>
+    </>
   )
 }
 
