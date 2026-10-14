@@ -1,6 +1,6 @@
 // Test helper: a fake auth server behind a mocked global fetch.
 //   const server = fakeAuthServer({ 'POST /login': () => reply(200, {...}) })
-//   server.calls -> [{ method, path, body, headers }, ...]
+//   server.calls -> [{ method, path, query, body, headers }, ...]
 import { vi } from 'vitest'
 
 export function reply(status, body) {
@@ -17,9 +17,9 @@ export function fakeAuthServer(handlers) {
   const calls = []
   const fetchMock = vi.fn(async (url, init = {}) => {
     const method = init.method ?? 'GET'
-    const path = new URL(url).pathname
+    const { pathname: path, search: query } = new URL(url)
     const body = init.body ? JSON.parse(init.body) : undefined
-    calls.push({ method, path, body, headers: init.headers ?? {} })
+    calls.push({ method, path, query, body, headers: init.headers ?? {} })
     const handler = handlers[`${method} ${path}`]
     if (!handler) return reply(404, { error: { code: 'not_found', message: 'Unknown route.' } })
     return handler(body, init)

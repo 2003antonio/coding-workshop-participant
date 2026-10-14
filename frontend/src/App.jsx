@@ -3,6 +3,7 @@ import { ThemeProvider } from '@mui/material/styles'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
+import EmployeesPage from './pages/EmployeesPage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import theme from './theme'
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/employees" element={<EmployeesPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
