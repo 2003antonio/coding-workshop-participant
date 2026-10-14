@@ -72,6 +72,39 @@ will be deployed to a cloud environment and accessible via a web browser.
 Participants will also gain hands-on experience with modern web development
 technologies and best practices.
 
+## Deploy notes
+
+Four new backend services (see [docs/api-contract.md](./docs/api-contract.md)),
+plus a change to `employees`. Each is a Python Lambda that Terraform finds by
+its `requirements.txt` (`infra/locals.tf`), with handler `function.handler` and
+a CloudFront route `/api/<name>*`. No infra changes are needed.
+
+What every service needs on deploy:
+
+* **Shared code copied in:** run `./scripts/sync-common.sh` first, so each
+  service folder gets its own `common/` (never committed).
+* **Python packages:** `PyJWT` and `pg8000` from its `requirements.txt`.
+* **Environment:** the usual `POSTGRES_HOST/PORT/NAME/USER/PASS`. All services
+  must share the same `POSTGRES_PASS`: the access-token key is derived from it.
+  `IS_LOCAL` must not be `true` in the cloud (TLS to the database).
+* **Database rights:** the first cold start of *any* service applies pending
+  migrations (lock-protected, safe to race), so the DB user needs DDL rights.
+
+| Service | Path | Needs | Notes |
+|---|---|---|---|
+| `teams` | `/api/teams` | migration 002 | Uses `DELETE` (remove member); CloudFront already allows it. |
+| `projects` | `/api/projects` | migrations 002–005 | Deliverables live under `/api/projects/{id}/deliverables`. |
+| `allocations` | `/api/allocations` | migrations 002–005 | 40-hour check locks the employee row (`SELECT ... FOR UPDATE`). |
+| `reports` | `/api/reports` | migrations 002–005 | Read-only queries, but still runs migrations on cold start. |
+| `employees` (changed) | `/api/employees` | migration 002 | Redeploy: returns `team_id`, and refuses to demote or archive a team lead. |
+
+Deploy all five together: the old `employees` code keeps working against the
+new schema, but the new services need tables from 002–005.
+
+Local only: `scripts/dev_server.py` serves all services on port 3001, and
+`scripts/seed_demo.py` fills a local database with demo data (passwords from
+`DEMO_ADMIN_PASSWORD`, `DEMO_MANAGER_PASSWORD`, `DEMO_EMPLOYEE_PASSWORD`).
+
 ## Contributing
 
 See the [CONTRIBUTING](./CONTRIBUTING.md) resource for more details.
