@@ -1,5 +1,5 @@
 """Employee business rules: who may see which record, who sees salary, and
-the archive / last-admin safety rules.
+the archive / last-admin / team-lead safety rules.
 
 routes.py has already checked the caller's minimum role; the rules here are
 the ones that depend on WHICH record is being read or changed.
@@ -12,6 +12,7 @@ from common import audit, auth, db
 from common.errors import Conflict, Forbidden, NotFound
 
 _NOT_FOUND = ("Employee not found.", "not_found")
+_LEADS_TEAM = "This employee leads an active team; assign a new lead first."
 
 
 def _view(row: dict, viewer_role: str) -> dict:
@@ -25,6 +26,7 @@ def _view(row: dict, viewer_role: str) -> dict:
         "email": row["email"],
         "job_title": row["job_title"],
         "role": row["role"],
+        "team_id": str(row["team_id"]) if row["team_id"] else None,
     }
     if viewer_role == "admin":
         view["salary"] = float(row["salary"])
@@ -81,7 +83,10 @@ def update_employee(actor: dict, employee_id: str, changes: dict) -> dict:
     """Change name, job_title, role and/or salary.
 
     Role and salary changes are audited by action name only: the old and new
-    values never reach the audit log. The last active admin cannot be demoted.
+    values never reach the audit log. The last active admin cannot be demoted,
+    and the lead of an active team cannot become an employee. The row lock
+    taken here is the one the teams service takes when naming a lead, so the
+    two checks cannot race.
     """
     with db.transaction():
         admins = _require_still_admin(actor)
@@ -95,6 +100,8 @@ def update_employee(actor: dict, employee_id: str, changes: dict) -> dict:
         losing_admin = "role" in changed and row["role"] == "admin"
         if losing_admin and len(admins) <= 1:
             raise Conflict("The last active admin cannot lose the admin role.", "last_admin")
+        if changed.get("role") == "employee" and repository.leads_active_team(employee_id):
+            raise Conflict(_LEADS_TEAM, "leads_team")
         if not changed:
             return _view(row, "admin")
 
@@ -117,6 +124,7 @@ def archive_employee(actor: dict, employee_id: str) -> dict:
     checked here under one lock: the caller must still be an active admin, and
     an admin cannot archive themselves. So at least the caller stays active,
     even when two admins try to archive each other at the same moment.
+    The lead of an active team cannot be archived either.
     """
     if str(actor["id"]) == employee_id:
         raise Conflict("You cannot archive yourself.", "cannot_archive_self")
@@ -127,6 +135,8 @@ def archive_employee(actor: dict, employee_id: str) -> dict:
             raise NotFound(*_NOT_FOUND)
         if row["archived_at"] is not None:
             raise Conflict("That employee is already archived.", "already_archived")
+        if repository.leads_active_team(employee_id):
+            raise Conflict(_LEADS_TEAM, "leads_team")
         archived = repository.archive_employee(employee_id)
         audit.record("employee_archived", actor["id"], "employee", employee_id)
     return _view(archived, "admin")

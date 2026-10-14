@@ -278,3 +278,41 @@ def test_the_last_active_admin_can_never_be_archived(api, svc, staff, make_emplo
     active_admins = _count(migrated_db, "SELECT 1 FROM employees "
                                         "WHERE role = 'admin' AND archived_at IS NULL")
     assert active_admins == 1
+
+
+# =====================================================================
+# Team leads (docs/api-contract.md section 2)
+# =====================================================================
+def _lead_a_team(db, lead, archived=False):
+    db.execute("INSERT INTO teams (name, lead_id, archived_at) "
+               "VALUES ('Platform', %s, CASE WHEN %s THEN now() END)", (str(lead["id"]), archived))
+
+
+def test_a_team_lead_cannot_be_demoted_to_employee(api, staff, token_for, migrated_db):
+    _lead_a_team(migrated_db, staff["manager"])
+    resp = api("PUT", _one(staff["manager"]["id"]), token=token_for(staff["admin"]),
+               body={"role": "employee"})
+    assert resp.status == 409 and resp.json["error"]["code"] == "leads_team"
+    row = migrated_db.query_one("SELECT role FROM employees WHERE id = %s", (str(staff["manager"]["id"]),))
+    assert row["role"] == "manager"
+
+
+def test_a_team_lead_can_still_change_between_manager_and_admin(api, staff, token_for, migrated_db):
+    _lead_a_team(migrated_db, staff["manager"])
+    resp = api("PUT", _one(staff["manager"]["id"]), token=token_for(staff["admin"]),
+               body={"role": "admin", "name": "Max M"})
+    assert resp.status == 200 and resp.json["role"] == "admin"
+
+
+def test_a_team_lead_cannot_be_archived(api, staff, token_for):
+    from common import db
+    _lead_a_team(db, staff["manager"])
+    resp = api("POST", _one(staff["manager"]["id"]) + "/archive", token=token_for(staff["admin"]))
+    assert resp.status == 409 and resp.json["error"]["code"] == "leads_team"
+
+
+def test_leading_only_an_archived_team_does_not_block(api, staff, token_for, migrated_db):
+    _lead_a_team(migrated_db, staff["manager"], archived=True)
+    token = token_for(staff["admin"])
+    assert api("PUT", _one(staff["manager"]["id"]), token=token, body={"role": "employee"}).status == 200
+    assert api("POST", _one(staff["manager"]["id"]) + "/archive", token=token).status == 200

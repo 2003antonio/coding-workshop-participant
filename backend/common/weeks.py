@@ -27,3 +27,8 @@ def count_weeks(start: datetime.date, end: datetime.date) -> int:
     if start > end:
         return 0
     return (week_start(end) - week_start(start)).days // 7 + 1
+
+
+def today() -> datetime.date:
+    """Today's date (UTC in Lambda). Services call this so tests can fix the date."""
+    return datetime.date.today()

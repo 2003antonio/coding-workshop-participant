@@ -7,7 +7,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 LIST = "/api/employees/"
-BASE_KEYS = {"id", "name", "email", "job_title", "role"}
+BASE_KEYS = {"id", "name", "email", "job_title", "role", "team_id"}
 ADMIN_KEYS = BASE_KEYS | {"salary", "archived_at"}
 NEVER_RETURNED = ("password_hash", "failed_attempts", "locked_until", "password")
 
@@ -101,7 +101,7 @@ def test_employee_sees_own_record_without_salary(api, staff, token_for):
     resp = api("GET", _one(emp["id"]), token=token_for(emp))
     assert resp.status == 200
     assert resp.json == {"id": str(emp["id"]), "name": "Eve Employee", "email": "eve@acme.test",
-                         "job_title": "Engineer", "role": "employee"}
+                         "job_title": "Engineer", "role": "employee", "team_id": None}
 
 
 @pytest.mark.parametrize("target", ["admin", "manager"])
@@ -161,3 +161,13 @@ def test_role_comes_from_the_database_not_the_token(api, staff):
 def test_an_archived_callers_token_stops_working(api, make_employee, token_for):
     gone = make_employee(email="gone@acme.test", role="admin", archived=True)
     assert api("GET", LIST, token=token_for(gone)).status == 401
+
+
+@pytest.mark.parametrize("who", ["admin", "manager", "employee"])
+def test_every_viewer_sees_team_id(api, staff, token_for, migrated_db, who):
+    team = migrated_db.query_one("INSERT INTO teams (name, lead_id) VALUES ('Platform', %s) RETURNING id",
+                                 (str(staff["manager"]["id"]),))
+    migrated_db.execute("UPDATE employees SET team_id = %s WHERE id = %s",
+                        (team["id"], str(staff["employee"]["id"])))
+    resp = api("GET", _one(staff["employee"]["id"]), token=token_for(staff[who]))
+    assert resp.status == 200 and resp.json["team_id"] == str(team["id"])
