@@ -11,5 +11,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
+    // `npm run coverage` fails if any total drops below 80%.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/main.jsx', 'src/setupTests.js', 'src/test/**', 'src/**/*.test.{js,jsx}'],
+      thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
+    },
   },
 })

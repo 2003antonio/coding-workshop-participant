@@ -26,7 +26,10 @@ import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
 import * as employeeService from '../services/employeeService'
 import { withSessionRetry } from '../services/sessionRetry'
+import * as teamService from '../services/teamService'
+import { messageFor as teamMessageFor } from './apiMessages'
 import { messageFor } from './employeeMessages'
+import { teamName } from './people'
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
 const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -83,6 +86,8 @@ export default function EmployeesPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [notice, setNotice] = useState('')
+  const [warning, setWarning] = useState('')
+  const [teams, setTeams] = useState(null) // null until loaded (or if loading failed)
   // null, { kind: 'create' }, { kind: 'edit', employee } or { kind: 'archive', employee }
   const [dialog, setDialog] = useState(null)
 
@@ -110,20 +115,52 @@ export default function EmployeesPage() {
     }
   }, [allowed, api, isAdmin, showArchived, reloadKey])
 
-  function finish(message) {
+  // Team names for the Team column and the form. A manager gets only the teams they lead.
+  useEffect(() => {
+    if (!allowed) return undefined
+    let cancelled = false
+    api((token) => teamService.listTeams(token))
+      .then((rows) => { if (!cancelled) setTeams(rows) })
+      .catch(() => { if (!cancelled) setTeams(null) })
+    return () => {
+      cancelled = true
+    }
+  }, [allowed, api, reloadKey])
+
+  function finish(message, teamWarning = '') {
     setDialog(null)
     setNotice(message)
+    setWarning(teamWarning)
     setReloadKey((key) => key + 1)
   }
 
-  async function handleCreate(payload) {
-    const created = await api((token) => employeeService.createEmployee(token, payload))
-    finish(`${created.name} was added.`)
+  /**
+   * Membership lives on the team (POST/DELETE /api/teams/{id}/members), so a
+   * team change is a second step after the employee is saved. If it fails, the
+   * employee is still saved and a warning says what is left to do.
+   */
+  async function moveToTeam(employee, fromTeamId, toTeamId) {
+    if ((fromTeamId ?? null) === toTeamId) return ''
+    try {
+      if (fromTeamId) await api((token) => teamService.removeMember(token, fromTeamId, employee.id))
+      if (toTeamId) await api((token) => teamService.addMember(token, toTeamId, employee.id))
+      return ''
+    } catch (error) {
+      return `${employee.name} was saved, but their team was not changed: ${teamMessageFor(error)}`
+    }
   }
 
-  async function handleEdit(payload) {
-    const updated = await api((token) => employeeService.updateEmployee(token, dialog.employee.id, payload))
-    finish(`${updated.name} was updated.`)
+  async function handleCreate(payload, teamId) {
+    const created = await api((token) => employeeService.createEmployee(token, payload))
+    const teamWarning = await moveToTeam(created, null, teamId)
+    finish(`${created.name} was added.`, teamWarning)
+  }
+
+  async function handleEdit(payload, teamId) {
+    const { employee } = dialog
+    const updated = await api((token) => employeeService.updateEmployee(token, employee.id, payload))
+    const teamWarning = await moveToTeam(updated, employee.team_id, teamId)
+    finish(`${updated.name} was updated.`, teamWarning)
   }
 
   async function handleArchive() {
@@ -140,8 +177,8 @@ export default function EmployeesPage() {
     )
   }
 
-  // Columns: email and job title move under the name on a phone.
-  const columnCount = (isPhone ? 2 : 4) + (isAdmin ? 2 : 0)
+  // Columns: email, job title and team move under the name on a phone.
+  const columnCount = (isPhone ? 2 : 5) + (isAdmin ? 2 : 0)
 
   return (
     <AppShell maxWidth="lg">
@@ -169,6 +206,10 @@ export default function EmployeesPage() {
         </Alert>
       )}
 
+      {warning && (
+        <Alert severity="warning" onClose={() => setWarning('')} sx={{ mb: 2 }}>{warning}</Alert>
+      )}
+
       {loadState === 'loading' && (
         <Box role="status" aria-label="Loading employees" sx={{ display: 'grid', placeItems: 'center', py: 6 }}>
           <CircularProgress />
@@ -184,6 +225,7 @@ export default function EmployeesPage() {
                 <TableCell>Name</TableCell>
                 {!isPhone && <TableCell>Email</TableCell>}
                 {!isPhone && <TableCell>Job title</TableCell>}
+                {!isPhone && <TableCell>Team</TableCell>}
                 <TableCell>Role</TableCell>
                 {isAdmin && <TableCell align="right">Salary</TableCell>}
                 {isAdmin && <TableCell align="right">Actions</TableCell>}
@@ -209,12 +251,15 @@ export default function EmployeesPage() {
                         <Typography variant="body2" color="text.secondary">
                           {employee.job_title}
                           <br />
+                          {teamName(employee.team_id, teams ?? [])}
+                          <br />
                           {employee.email}
                         </Typography>
                       )}
                     </TableCell>
                     {!isPhone && <TableCell>{employee.email}</TableCell>}
                     {!isPhone && <TableCell>{employee.job_title}</TableCell>}
+                    {!isPhone && <TableCell>{teamName(employee.team_id, teams ?? [])}</TableCell>}
                     <TableCell>{ROLE_LABELS[employee.role] ?? employee.role}</TableCell>
                     {isAdmin && <TableCell align="right">{money.format(employee.salary)}</TableCell>}
                     {isAdmin && (
@@ -243,10 +288,10 @@ export default function EmployeesPage() {
       )}
 
       {dialog?.kind === 'create' && (
-        <EmployeeFormDialog onClose={() => setDialog(null)} onSubmit={handleCreate} />
+        <EmployeeFormDialog teams={teams} onClose={() => setDialog(null)} onSubmit={handleCreate} />
       )}
       {dialog?.kind === 'edit' && (
-        <EmployeeFormDialog employee={dialog.employee} onClose={() => setDialog(null)}
+        <EmployeeFormDialog employee={dialog.employee} teams={teams} onClose={() => setDialog(null)}
           onSubmit={handleEdit} />
       )}
       {dialog?.kind === 'archive' && (
