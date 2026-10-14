@@ -30,6 +30,9 @@ const BY_CODE = {
   cannot_archive_self: "You can't archive your own account.",
 }
 
+/** Shown in every "Archive ...?" confirmation. */
+export const ARCHIVE_NOTE = 'Archived items stay in the history but disappear from lists.'
+
 export const API_MESSAGES = {
   badInput: 'Some details were not accepted. Check the form and try again.',
   forbidden: "You don't have permission to do that.",

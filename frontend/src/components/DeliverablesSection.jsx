@@ -8,9 +8,10 @@ import TextField from '@mui/material/TextField'
 import { useApi, useLoad } from '../auth/useApi'
 import { detailsSentence, namesOf } from '../services/errorDetails'
 import * as projectService from '../services/projectService'
-import { messageFor } from '../pages/apiMessages'
+import { ARCHIVE_NOTE, messageFor } from '../pages/apiMessages'
 import { DELIVERABLE_STATUS, formatDate } from '../pages/format'
-import { DeliverableFormDialog, DependenciesDialog } from './DeliverableDialogs'
+import ConfirmDialog from './ConfirmDialog'
+import { DeliverableEditDialog, DeliverableFormDialog, DependenciesDialog } from './DeliverableDialogs'
 import { LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
@@ -23,7 +24,8 @@ import StatusChip from './StatusChip'
 export default function DeliverablesSection({ project, canEdit }) {
   const api = useApi()
   const [notice, setNotice] = useState(null) // { severity, text }
-  const [dialog, setDialog] = useState(null) // null, { kind: 'add' } or { kind: 'deps', deliverable }
+  // null, { kind: 'add' }, or { kind: 'deps' | 'edit' | 'archive', deliverable }
+  const [dialog, setDialog] = useState(null)
   const [saving, setSaving] = useState(null) // id of the deliverable whose status is being saved
 
   const load = useCallback(
@@ -45,6 +47,26 @@ export default function DeliverablesSection({ project, canEdit }) {
       projectService.setDependencies(token, project.id, dialog.deliverable.id, dependsOn))
     setDialog(null)
     setNotice({ severity: 'success', text: `Dependencies of ${updated.name} were saved.` })
+    result.reload()
+  }
+
+  async function handleEdit(changes) {
+    const { deliverable } = dialog
+    if (Object.keys(changes).length === 0) {
+      setDialog(null)
+      return
+    }
+    const updated = await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, changes))
+    setDialog(null)
+    setNotice({ severity: 'success', text: `${updated.name} was updated.` })
+    result.reload()
+  }
+
+  async function handleArchive() {
+    const { deliverable } = dialog
+    await api((token) => projectService.archiveDeliverable(token, project.id, deliverable.id))
+    setDialog(null)
+    setNotice({ severity: 'success', text: `${deliverable.name} was archived.` })
     result.reload()
   }
 
@@ -105,10 +127,20 @@ export default function DeliverablesSection({ project, canEdit }) {
               d.depends_on.length ? namesOf(d.depends_on, rows).join(', ') : '—'
             ) },
             { key: 'actions', label: 'Actions', align: 'right', hidden: !canEdit, render: (d) => (
-              <Button size="small" aria-label={`Edit dependencies of ${d.name}`}
-                onClick={() => setDialog({ kind: 'deps', deliverable: d })}>
-                Dependencies
-              </Button>
+              <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end' }}>
+                <Button size="small" aria-label={`Edit ${d.name}`} sx={{ minHeight: 44 }}
+                  onClick={() => setDialog({ kind: 'edit', deliverable: d })}>
+                  Edit
+                </Button>
+                <Button size="small" aria-label={`Edit dependencies of ${d.name}`} sx={{ minHeight: 44 }}
+                  onClick={() => setDialog({ kind: 'deps', deliverable: d })}>
+                  Dependencies
+                </Button>
+                <Button size="small" color="error" aria-label={`Archive ${d.name}`} sx={{ minHeight: 44 }}
+                  onClick={() => setDialog({ kind: 'archive', deliverable: d })}>
+                  Archive
+                </Button>
+              </Box>
             ) },
           ]} />
         )}
@@ -120,6 +152,15 @@ export default function DeliverablesSection({ project, canEdit }) {
       {dialog?.kind === 'deps' && (
         <DependenciesDialog deliverable={dialog.deliverable} deliverables={rows} onClose={() => setDialog(null)}
           onSubmit={handleDependencies} />
+      )}
+      {dialog?.kind === 'edit' && (
+        <DeliverableEditDialog project={project} deliverable={dialog.deliverable} deliverables={rows}
+          onClose={() => setDialog(null)} onSubmit={handleEdit} />
+      )}
+      {dialog?.kind === 'archive' && (
+        <ConfirmDialog title={`Archive ${dialog.deliverable.name}?`}
+          description={ARCHIVE_NOTE} confirmLabel="Archive"
+          onClose={() => setDialog(null)} onConfirm={handleArchive} />
       )}
     </Box>
   )

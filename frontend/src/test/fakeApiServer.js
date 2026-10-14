@@ -665,6 +665,59 @@ function createApi(db, meId, today) {
         }),
       })
     }],
+
+    // F2 crud handlers: deliverable archive, allocation edit, team archive (§3, §5, §6).
+    ['POST', /^\/api\/projects\/(?<id>[^/]+)\/deliverables\/(?<did>[^/]+)\/archive$/, ({ params }) => {
+      const project = visibleProject(params.id)
+      const row = byId('deliverables', params.did)
+      if (!project || !row || row.project_id !== project.id) return notFound()
+      if (!canManageProject(project)) return forbidden()
+      if (project.archived_at) return err(409, 'archived')
+      if (row.archived_at) return err(409, 'already_archived')
+      if (db.deliverables.some((d) => active(d) && d.depends_on.includes(row.id))) return err(409, 'has_dependents')
+      row.archived_at = `${today}T12:00:00+00:00`
+      return reply(200, deliverableView(row))
+    }],
+    ['PUT', /^\/api\/allocations\/(?<id>[^/]+)$/, ({ body, params }) => {
+      const row = byId('allocations', params.id)
+      const project = row && visibleProject(row.project_id)
+      if (!project) return notFound()
+      const employee = byId('employees', row.employee_id)
+      if (!isAdmin() && !(leads(project.team_id) && employee.team_id === project.team_id)) return forbidden()
+      if (!body || typeof body !== 'object'
+        || Object.keys(body).some((k) => !['hours_per_week', 'start_date', 'end_date'].includes(k))) {
+        return err(400, 'bad_request')
+      }
+      if (row.archived_at) return err(409, 'archived')
+      const next = { ...row, ...body }
+      if (!Number.isInteger(next.hours_per_week) || next.hours_per_week < 1 || next.hours_per_week > 40) {
+        return err(400, 'bad_request')
+      }
+      if (next.start_date > next.end_date || next.start_date < project.start_date
+        || next.end_date > project.end_date) return err(400, 'invalid_dates')
+      if (project.archived_at || project.status === 'completed') return err(409, 'project_closed')
+      if (db.allocations.some((a) => active(a) && a.id !== row.id && a.employee_id === row.employee_id
+        && a.project_id === row.project_id && a.start_date <= next.end_date && a.end_date >= next.start_date)) {
+        return err(409, 'overlapping_allocation')
+      }
+      const load = weekLoad(row.employee_id, { skipId: row.id })
+      const weeks = weeksTouched(next.start_date, next.end_date)
+        .map((week_start) => ({ week_start, hours: (load[week_start] ?? 0) + next.hours_per_week }))
+        .filter((w) => w.hours > 40)
+      if (weeks.length) return err(409, 'over_allocated', { weeks })
+      Object.assign(row, body)
+      return reply(200, allocationView(row))
+    }],
+    ['POST', /^\/api\/teams\/(?<id>[^/]+)\/archive$/, ({ params }) => {
+      if (!isAdmin()) return forbidden()
+      const team = byId('teams', params.id)
+      if (!team) return notFound()
+      if (team.archived_at) return err(409, 'already_archived')
+      if (db.projects.some((p) => active(p) && p.team_id === team.id)) return err(409, 'has_active_projects')
+      team.archived_at = `${today}T12:00:00+00:00`
+      db.employees.filter((e) => e.team_id === team.id).forEach((e) => { e.team_id = null })
+      return reply(200, teamView(team, true))
+    }],
   ]
 }
 

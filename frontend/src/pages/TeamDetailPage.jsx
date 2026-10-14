@@ -19,6 +19,7 @@ import { AddMemberDialog, TeamFormDialog } from '../components/TeamDialogs'
 import * as budgetService from '../services/budgetService'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
+import { ARCHIVE_NOTE } from './apiMessages'
 import { ROLE_LABELS } from './format'
 import { leadCandidates, memberCandidates } from './people'
 
@@ -47,7 +48,7 @@ export default function TeamDetailPage() {
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const isAdmin = canManageTeams(role)
   const [notice, setNotice] = useState('')
-  // null, { kind: 'edit' }, { kind: 'add' } or { kind: 'remove', member }
+  // null, { kind: 'edit' }, { kind: 'add' }, { kind: 'archive' } or { kind: 'remove', member }
   const [dialog, setDialog] = useState(null)
 
   const loadTeam = useCallback((call) => call((token) => teamService.getTeam(token, id)), [id])
@@ -86,6 +87,11 @@ export default function TeamDetailPage() {
     finish(`${member.name} was removed from the team.`)
   }
 
+  async function handleArchive() {
+    const archived = await api((token) => teamService.archiveTeam(token, id))
+    finish(`${archived.name} was archived.`)
+  }
+
   return (
     <AppShell maxWidth="lg">
       <Link component={RouterLink} to="/teams" sx={{ display: 'inline-block', mb: 2 }}>← All teams</Link>
@@ -106,6 +112,9 @@ export default function TeamDetailPage() {
                   <Button variant="contained" onClick={() => setDialog({ kind: 'add' })}
                     disabled={people.status !== 'ready'}>
                     Add member
+                  </Button>
+                  <Button variant="outlined" color="error" onClick={() => setDialog({ kind: 'archive' })}>
+                    Archive team
                   </Button>
                 </>
               )}
@@ -145,6 +154,11 @@ export default function TeamDetailPage() {
               <ConfirmDialog title={`Remove ${dialog.member.name} from ${data.name}?`}
                 description="They keep their existing assignments. You can add them to another team afterwards."
                 confirmLabel="Remove" onClose={() => setDialog(null)} onConfirm={handleRemove} />
+            )}
+            {dialog?.kind === 'archive' && (
+              <ConfirmDialog title={`Archive ${data.name}?`}
+                description={`${ARCHIVE_NOTE} Its members are taken off the team.`}
+                confirmLabel="Archive" onClose={() => setDialog(null)} onConfirm={handleArchive} />
             )}
           </Stack>
         )}
