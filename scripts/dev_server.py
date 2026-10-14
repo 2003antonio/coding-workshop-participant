@@ -2,7 +2,8 @@
 
 Turns each HTTP request into a Lambda Function URL-shaped event and calls the
 handler of the service named in the URL (/api/auth/... -> backend/auth,
-/api/employees/... -> backend/employees), with CORS for the React dev server.
+/api/teams/... -> backend/teams, and so on for every name in SERVICE_NAMES),
+with CORS for the React dev server.
 Each service is loaded in isolation (see service_loader.py) because they all
 have modules named routes, services and repository.
 Binds to 127.0.0.1 only. One thread per connection, so a browser's idle
@@ -34,13 +35,13 @@ from service_loader import load_service  # noqa: E402
 from common import db  # noqa: E402
 
 PORT = 3001
-SERVICE_NAMES = ("auth", "employees")
+SERVICE_NAMES = ("auth", "employees", "teams")
 # The React dev server: Vite's default port, and the port in frontend/vite.config.js.
 ALLOWED_ORIGINS = frozenset({"http://localhost:5173", "http://localhost:3000"})
 ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 _MAX_READ_BYTES = 1024 * 1024  # the handler enforces the real 64 KB limit
 
-# Filled by main(): {"auth": <auth function module>, "employees": ...}.
+# Filled by main(): {"auth": <auth function module>, "employees": ..., ...}.
 HANDLERS: dict = {}
 
 _UNKNOWN_SERVICE = {"statusCode": 404, "headers": {"Content-Type": "application/json"},

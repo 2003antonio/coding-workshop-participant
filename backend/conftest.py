@@ -171,6 +171,12 @@ class Response:
 
 
 @pytest.fixture
+def lambda_event():
+    """The make_event builder, for tests that call a handler directly."""
+    return make_event
+
+
+@pytest.fixture
 def call_service(migrated_db):
     """call_service(svc) -> api(method, path, as_=employee_row, body=..., query=...)."""
     from common import auth

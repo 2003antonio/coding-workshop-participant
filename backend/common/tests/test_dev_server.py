@@ -50,6 +50,7 @@ def test_only_real_services_can_be_loaded(name):
     ("/api/auth", "auth"),
     ("/api/employees/", "employees"),
     ("/api/employees/abc/archive", "employees"),
+    ("/api/teams/abc/members/def", "teams"),
     ("/api/authors/x", None),
     ("/api/nope", None),
     ("/login", None),
@@ -88,13 +89,16 @@ def _request(port, method, path, headers=None):
 
 
 @pytest.mark.integration
-def test_one_server_routes_to_both_services_by_url(server):
-    # Both answer 401 without a token, which proves each request reached a real
+def test_one_server_routes_to_every_service_by_url(server):
+    # Each answers 401 without a token, which proves each request reached a real
     # service handler (the dev server's own fallback is a 404).
     status, _, body = _request(server, "GET", "/api/auth/me")
     assert status == 401 and body["error"]["code"] == "unauthorized"
     status, _, body = _request(server, "GET", "/api/employees/")
     assert status == 401 and body["error"]["code"] == "unauthorized"
+    for name in dev_server.SERVICE_NAMES[2:]:
+        status, _, body = _request(server, "GET", f"/api/{name}/")
+        assert status == 401, name
     status, _, body = _request(server, "GET", "/api/nope/")
     assert status == 404 and body["error"]["code"] == "not_found"
 
