@@ -251,18 +251,21 @@ Known limit: comparing totals before and after one person joins or leaves can st
 
 **Project budget** — `GET /api/projects/{id}/budget` (admin, the project's manager):
 ```json
-{ "project_id": "uuid", "planned": 52000.00, "used": 18400.00, "remaining": 33600.00,
-  "allocated_people": 3, "hidden_reason": null,
+{ "project_id": "uuid", "planned_budget": 20000.00, "committed_cost": 13000.00,
+  "used_cost_to_date": 6800.00, "allocated_people": 3, "hidden_reason": null,
   "lines": [{"allocation_id": "uuid", "employee": {"id": "uuid", "name": "Bo"},
-             "hours_per_week": 20, "weeks": 7, "hourly_rate": 52.88, "planned": 7403.85, "used": 2115.38}] }
+             "hours_per_week": 20, "weeks": 7, "hourly_rate": 50.00,
+             "committed_cost": 7000.00, "used_cost_to_date": 2000.00}] }
 ```
 - Per allocation: cost = `hours_per_week × hourly_rate × weeks touched` (same week rule as §1).
-- `planned` here is the **committed cost** of active allocations over their whole ranges (the
-  same figure as `committed_cost` in report 7); it is *not* `planned_budget`. `used` = cost of
-  the weeks up to and including the current week. `remaining` = planned − used.
-- `lines` is **admin only**. Managers get totals only, and only when `allocated_people` is at
-  least `MIN_AGGREGATE_GROUP`; otherwise `planned`, `used`, `remaining` are `null` with
-  `"hidden_reason": "below_min_group"` (a manager sees the hours, so a small total would reveal a rate).
+- `committed_cost` = cost of active allocations over their whole ranges (the same figure as
+  in report 7). `used_cost_to_date` = cost of the weeks up to and including the current week.
+- `planned_budget` = the typed-in budget (§4), or `null`. It is not salary-derived, so admin
+  and the project's manager always see it, even when the costs are hidden.
+- `lines` is **admin only**, ordered by person then start date. Managers get totals only, and
+  only when `allocated_people` is at least `MIN_AGGREGATE_GROUP`; otherwise `committed_cost`
+  and `used_cost_to_date` are `null` with `"hidden_reason": "below_min_group"` (a manager sees
+  the hours, so a small total would reveal a rate).
 
 ## 8. Reports (`/api/reports`, all `GET`)
 
@@ -336,7 +339,8 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
    ```
    Per project:
    - `planned_budget`: the typed-in budget, or `null` if none. Never hidden.
-   - `committed_cost`: cost of all active allocations over their full ranges.
+   - `committed_cost`: cost of all active allocations over their full ranges (same figure
+     as the project budget, §7).
    - `used_cost_to_date`: cost of the weeks up to and including the current week.
    - `percent_used`: `used_cost_to_date / planned_budget × 100` (0–100 scale, one decimal, may
      exceed 100); `null` when there is no planned budget or it is 0.
