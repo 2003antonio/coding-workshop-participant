@@ -1,0 +1,18 @@
+# start-dev.sh vendors third-party packages into this folder with
+# `pip install --target` (jwt/, pg8000/, six.py, *.dist-info/, ...). Never
+# commit them: ignore everything here, then re-include our own files by name.
+# Add a line below when you add a new module to this service.
+*
+
+!.gitignore
+!requirements.txt
+!function.py
+!routes.py
+!services.py
+!repository.py
+!tests/
+!tests/**
+
+# ...but never bytecode caches, even inside the re-included folders.
+__pycache__/
+*.py[cod]
