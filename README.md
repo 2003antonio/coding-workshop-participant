@@ -93,13 +93,14 @@ What every service needs on deploy:
 | Service | Path | Needs | Notes |
 |---|---|---|---|
 | `teams` | `/api/teams` | migration 002 | Uses `DELETE` (remove member); CloudFront already allows it. |
-| `projects` | `/api/projects` | migrations 002–005 | Deliverables live under `/api/projects/{id}/deliverables`. |
-| `allocations` | `/api/allocations` | migrations 002–005 | 40-hour check locks the employee row (`SELECT ... FOR UPDATE`). |
-| `reports` | `/api/reports` | migrations 002–005 | Read-only queries, but still runs migrations on cold start. |
+| `projects` | `/api/projects` | migrations 002–006 | Deliverables live under `/api/projects/{id}/deliverables`. |
+| `allocations` | `/api/allocations` | migrations 002–006 | 40-hour check locks the employee row (`SELECT ... FOR UPDATE`). |
+| `reports` | `/api/reports` | migrations 002–006 | Read-only queries, but still runs migrations on cold start. |
 | `employees` (changed) | `/api/employees` | migration 002 | Redeploy: returns `team_id`, and refuses to demote or archive a team lead. |
 
 Deploy all five together: the old `employees` code keeps working against the
-new schema, but the new services need tables from 002–005.
+new schema, but the new services need the tables and columns from 002–006
+(006 adds `projects.planned_budget`).
 
 Local only: `scripts/dev_server.py` serves all services on port 3001, and
 `scripts/seed_demo.py` fills a local database with demo data (passwords from
