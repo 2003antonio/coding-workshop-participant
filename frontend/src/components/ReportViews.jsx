@@ -16,23 +16,25 @@ import { Link as RouterLink } from 'react-router-dom'
 import { useLoad } from '../auth/useApi'
 import * as projectService from '../services/projectService'
 import * as reportService from '../services/reportService'
-import { RISK_REASONS, formatDate, formatMoney, formatPercent, hiddenMessage } from '../pages/format'
+import {
+  RISK_REASONS, formatDate, formatMoney, formatPercent, formatWeek, formatWeekShort, hiddenMessage,
+} from '../pages/format'
 import BudgetFlag from './BudgetFlag'
 import { Empty, LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
 
 const projectLink = (p) => <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`}>{p.name}</Link>
-const shortWeek = (week) => formatDate(week).replace(/, \d{4}$/, '')
 const money = (amount) => (amount === null || amount === undefined ? '—' : formatMoney(amount))
 const DEFAULT_THRESHOLD = 32
+const PICK_PROJECT = 'Choose a project to see its dependency chain.'
 
 /** 1. Project status: progress and deliverable counts per project. */
 export function ProjectStatusReport() {
   const load = useCallback((call) => call((token) => reportService.projectStatus(token)), [])
   const result = useLoad(load)
   return (
-    <LoadState result={result} label="Loading project status">
+    <LoadState result={result} label="Loading project status" skeleton="table">
       {(data) => (
         <ResponsiveTable label="Project status" rows={data.projects} empty="No projects to report on."
           columns={[
@@ -60,7 +62,7 @@ export function AtRiskReport() {
   const load = useCallback((call) => call((token) => reportService.atRiskProjects(token)), [])
   const result = useLoad(load)
   return (
-    <LoadState result={result} label="Loading at-risk projects">
+    <LoadState result={result} label="Loading at-risk projects" skeleton="cards">
       {(data) => (data.projects.length === 0 ? <Empty>No projects are at risk right now.</Empty> : (
         <Stack component="ul" aria-label="At-risk projects" spacing={1.5} sx={{ listStyle: 'none', p: 0, m: 0 }}>
           {data.projects.map((p) => (
@@ -88,17 +90,17 @@ export function ResourcesReport() {
   const load = useCallback((call) => call((token) => reportService.resourceAllocation(token)), [])
   const result = useLoad(load)
   return (
-    <LoadState result={result} label="Loading resource allocation">
+    <LoadState result={result} label="Loading resource allocation" skeleton="table">
       {(data) => (
         <>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Hours per week, from the week of {formatDate(data.weeks[0])}. “Elsewhere” is time on projects you can’t see.
+            Hours per week, from the {formatWeek(data.weeks[0])}. “Elsewhere” is time on projects you can’t see.
           </Typography>
           <ResponsiveTable label="Resource allocation" rows={data.people} empty="No one to show."
             columns={[
               { key: 'name', label: 'Person', primary: true, render: (p) => p.name },
               ...data.weeks.map((week, i) => ({
-                key: week, label: shortWeek(week), align: 'right', render: (p) => {
+                key: week, label: formatWeekShort(week), align: 'right', render: (p) => {
                   const w = p.weeks[i]
                   if (!w || w.total_hours === 0) return '—'
                   const names = w.projects.map((x) => `${x.name}: ${x.hours} h`)
@@ -126,7 +128,7 @@ export function DeliverablesReport() {
       <FormControlLabel label="Only overdue" sx={{ mb: 1 }} control={
         <Switch checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} />
       } />
-      <LoadState result={result} label="Loading deliverable status">
+      <LoadState result={result} label="Loading deliverable status" skeleton="table">
         {(data) => (
           <ResponsiveTable label="Deliverable status" rows={data.deliverables}
             empty={overdueOnly ? 'Nothing is overdue.' : 'No deliverables to report on.'}
@@ -173,14 +175,14 @@ export function CapacityReport() {
         helperText={valid ? 'People above this in any week are listed. 40 should list no one.'
           : 'Enter whole hours from 1 to 40.'}
         slotProps={{ htmlInput: { inputMode: 'numeric' } }} />
-      <LoadState result={result} label="Loading near-capacity report">
+      <LoadState result={result} label="Loading near-capacity report" skeleton="table">
         {(data) => (
           <ResponsiveTable label="Near capacity" rows={data.people}
             empty={`No one is above ${data.threshold} hours in any week.`}
             columns={[
               { key: 'name', label: 'Person', primary: true, render: (p) => p.name },
               { key: 'weeks', label: `Weeks above ${data.threshold} h`, render: (p) => (
-                p.weeks.map((w) => `${shortWeek(w.week_start)}: ${w.total_hours} h`).join(', ')
+                p.weeks.map((w) => `${formatWeekShort(w.week_start)}: ${w.total_hours} h`).join(', ')
               ) },
             ]} />
         )}
@@ -201,17 +203,17 @@ export function ChainReport() {
   const chain = useLoad(loadChain)
 
   return (
-    <LoadState result={projects} label="Loading projects">
+    <LoadState result={projects} label="Loading projects" skeleton="list">
       {(list) => (list.length === 0 ? <Empty>No projects to show.</Empty> : (
         <>
           <TextField select label="Project" size="small" value={projectId} sx={{ mb: 2, minWidth: 240 }}
             onChange={(e) => setProjectId(e.target.value)}>
             {list.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
           </TextField>
-          {!projectId ? <Empty>Choose a project to see its dependency chain.</Empty> : (
-            <LoadState result={chain} label="Loading dependency chain">
+          {!projectId ? <Empty>{PICK_PROJECT}</Empty> : (
+            <LoadState result={chain} label="Loading dependency chain" skeleton="table">
               {(data) => {
-                if (!data) return null
+                if (!data) return <Empty>{PICK_PROJECT}</Empty>
                 const byId = new Map(data.nodes.map((n) => [n.id, n]))
                 const depsOf = (id) => data.edges.filter((e) => e.to === id).map((e) => byId.get(e.from)?.name)
                 if (data.nodes.length === 0) return <Empty>This project has no deliverables yet.</Empty>
@@ -251,7 +253,7 @@ export function BudgetReport() {
   const result = useLoad(load)
   const note = (row) => (row.hidden_reason ? hiddenMessage(row.hidden_reason) : '')
   return (
-    <LoadState result={result} label="Loading budget report">
+    <LoadState result={result} label="Loading budget report" skeleton="table">
       {(data) => (
         <Stack spacing={3}>
           <Box component="section" aria-labelledby="budget-projects-heading">

@@ -11,12 +11,12 @@ const deliverables = [
 describe('weeksOverSentence', () => {
   it('names every week and its hours, in the order the server sent them', () => {
     expect(weeksOverSentence([{ week_start: '2026-10-26', hours: 45 }, { week_start: '2026-11-02', hours: 45 }]))
-      .toBe('Over 40 hours in: week of Oct 26 (45 h), week of Nov 2 (45 h)')
+      .toBe('Over 40 hours in: week of Oct 26, 2026 (45 h), week of Nov 2, 2026 (45 h)')
   })
 
   it('reads the Monday as a calendar day, so it never shifts across a time zone or a year', () => {
     expect(weeksOverSentence([{ week_start: '2026-12-28', hours: 41 }, { week_start: '2027-01-04', hours: 48 }]))
-      .toBe('Over 40 hours in: week of Dec 28 (41 h), week of Jan 4 (48 h)')
+      .toBe('Over 40 hours in: week of Dec 28, 2026 (41 h), week of Jan 4, 2027 (48 h)')
   })
 
   it('is null without weeks', () => {
@@ -59,7 +59,7 @@ describe('detailsSentence', () => {
   it('picks the sentence by error code', () => {
     const weeks = [{ week_start: '2026-11-16', hours: 46 }]
     expect(detailsSentence(new ApiError(409, 'over_allocated', { weeks })))
-      .toBe('Over 40 hours in: week of Nov 16 (46 h)')
+      .toBe('Over 40 hours in: week of Nov 16, 2026 (46 h)')
     expect(detailsSentence(new ApiError(409, 'dependency_cycle', { cycle: ['d-2', 'd-1'] }), { deliverables }))
       .toBe('Loop: Billing UI -> Pay API -> Billing UI')
     expect(detailsSentence(new ApiError(409, 'dependencies_not_done', { pending: ['d-1'] }), { deliverables }))

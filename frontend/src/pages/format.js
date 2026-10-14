@@ -15,6 +15,19 @@ export function formatDate(date) {
   return day.format(new Date(`${date}T00:00:00Z`))
 }
 
+const monthDay = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+/** Monday "2026-12-28" -> "week of Dec 28, 2026". Every week label carries its year. */
+export function formatWeek(date) {
+  return date ? `week of ${formatDate(date)}` : '—'
+}
+
+/** Monday "2026-12-28" -> "Dec 28 ’26": the compact form for column headers and lists, still with the year. */
+export function formatWeekShort(date) {
+  if (!date) return '—'
+  return `${monthDay.format(new Date(`${date}T00:00:00Z`))} ’${date.slice(2, 4)}`
+}
+
 export const PROJECT_STATUS = {
   planned: 'Planned',
   active: 'Active',

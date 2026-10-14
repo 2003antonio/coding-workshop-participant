@@ -168,7 +168,7 @@ describe('Project detail: people', () => {
 
     // Eve already has 20 h here and 16 h on Data Lake in the week of Nov 16.
     expect(await within(dialog).findByText('This would put the person over 40 hours in some weeks.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16 (46 h)')).toBeInTheDocument()
+    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16, 2026 (46 h)')).toBeInTheDocument()
     expect(within(dialog).queryByText(/Data Lake/)).not.toBeInTheDocument()
     expect(server.calls.at(-1).body).toEqual({
       employee_id: 'u-3', project_id: 'p-1', hours_per_week: 10, start_date: '2026-11-02', end_date: '2027-03-31',

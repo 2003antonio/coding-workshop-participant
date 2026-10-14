@@ -18,7 +18,8 @@ export function useApi() {
 
 /**
  * Load data for a page. `load(api)` must be memoised (useCallback): a new
- * function means "load again". While reloading, the last data stays on screen.
+ * function means "load something else" and shows 'loading' until it answers.
+ * reload() loads the same thing again; meanwhile the last data stays on screen.
  *   const { status, data, error, reload } = useLoad(load)
  * status: 'loading' (nothing to show yet) | 'error' | 'ready'.
  * error is a friendly fixed message, never the server's text.
@@ -39,10 +40,13 @@ export function useLoad(load) {
     }
   }, [api, load, reloads])
 
-  const current = result.load === load && result.reloads === reloads
+  // A new load function means new data: the last result (even a null one) is
+  // never shown as its answer. Only a reload of the same load keeps old data.
+  const sameLoad = result.load === load
+  const current = sameLoad && result.reloads === reloads
   let status = 'ready'
   if (current && result.error) status = 'error'
-  else if (!current && result.data === undefined) status = 'loading'
+  else if (!sameLoad || (!current && result.data === undefined)) status = 'loading'
   const reload = useCallback(() => setReloads((n) => n + 1), [])
-  return { status, data: result.data, error: current ? result.error : '', reload }
+  return { status, data: sameLoad ? result.data : undefined, error: current ? result.error : '', reload }
 }

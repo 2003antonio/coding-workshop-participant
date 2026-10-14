@@ -68,7 +68,7 @@ describe('Reports: content', () => {
     renderApp('/reports?report=resources')
     await screen.findByRole('table', { name: 'Resource allocation' })
     const headers = headersOf('Resource allocation')
-    expect(headers.slice(0, 3)).toEqual(['Person', 'Nov 9', 'Nov 16'])
+    expect(headers.slice(0, 3)).toEqual(['Person', 'Nov 9 ’26', 'Nov 16 ’26'])
     expect(headers).toHaveLength(13) // person + 12 weeks
     expect(screen.getAllByRole('rowheader').map((r) => r.textContent)).toEqual(['Eve Employee', 'Bo Builder', 'Cy Coder'])
     const eveWeek2 = within(rowFor('Eve Employee')).getAllByRole('cell')[1]
@@ -95,8 +95,8 @@ describe('Reports: content', () => {
     await screen.findByRole('table', { name: 'Near capacity' })
     expect(reportCalls(server, 'over-allocated')[0].query).toBe('?threshold=32')
     expect(headersOf('Near capacity')).toEqual(['Person', 'Weeks above 32 h'])
-    expect(within(rowFor('Eve Employee')).getByText('Nov 16: 36 h')).toBeInTheDocument()
-    expect(within(rowFor('Dee Data')).getByText('Nov 9: 36 h, Nov 16: 36 h, Nov 23: 36 h')).toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByText('Nov 16 ’26: 36 h')).toBeInTheDocument()
+    expect(within(rowFor('Dee Data')).getByText('Nov 9 ’26: 36 h, Nov 16 ’26: 36 h, Nov 23 ’26: 36 h')).toBeInTheDocument()
 
     const field = screen.getByRole('textbox', { name: 'Threshold (hours per week)' })
     await user.clear(field)
