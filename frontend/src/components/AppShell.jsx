@@ -23,6 +23,7 @@ import { useAuth } from '../auth/useAuth'
 import { useBreakpoint } from '../hooks/useBreakpoint'
 import { navItemsFor, sectionTitle } from '../navigation'
 import { ROLE_LABELS } from '../pages/format'
+import PageTransition from './motion/PageTransition'
 
 const SIDEBAR_WIDTH = 240
 
@@ -143,7 +144,7 @@ export default function AppShell({ children, maxWidth = 'md' }) {
         </AppBar>
         <Container component="main" id="main-content" tabIndex={-1} maxWidth={maxWidth}
           sx={{ py: isPhone ? 3 : 5, outline: 'none' }}>
-          {children}
+          <PageTransition>{children}</PageTransition>
         </Container>
       </Box>
     </Box>

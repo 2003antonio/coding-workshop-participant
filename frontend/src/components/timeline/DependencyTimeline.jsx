@@ -4,6 +4,7 @@ import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { DELIVERABLE_STATUS, formatDate } from '../../pages/format'
+import { useMotion } from '../motion/motion'
 import StatusChip from '../StatusChip'
 import {
   axisTicks, barPosition, dayNumber, dayToDate, flagsFor, percentAt, sentenceFor, spanOf,
@@ -20,7 +21,9 @@ const visuallyHidden = {
 
 /** Bar fill per status. Overdue and blocked add a border or stripes AND a text chip. */
 const FILL = { not_started: 'grey.500', in_progress: 'primary.main', done: 'success.main' }
-const STRIPES = 'repeating-linear-gradient(45deg, transparent 0 5px, rgba(0,0,0,0.35) 5px 9px)'
+// Stripes in the page background colour, so they read in light and dark mode.
+const STRIPES = (t) =>
+  `repeating-linear-gradient(45deg, transparent 0 5px, ${(t.vars ?? t).palette.background.paper} 5px 8px)`
 
 function Flags({ flags }) {
   return (
@@ -42,10 +45,11 @@ function LongestChain({ chain, names }) {
 
 /** Phone: the same information as an ordered list of cards, no chart. */
 function PhoneList({ rows, names }) {
+  const motion = useMotion()
   return (
     <Box component="ol" aria-label={LIST_LABEL} sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 1.5 }}>
       {rows.map(({ node, flags }, i) => (
-        <Paper component="li" key={node.id} variant="outlined" sx={{ p: 2 }}>
+        <Paper component="li" key={node.id} variant="outlined" sx={[{ p: 2 }, motion('enter', i)]}>
           <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600 }}>{i + 1}. {node.name}</Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, my: 0.5 }}>
             <StatusChip status={node.status} />
@@ -70,7 +74,7 @@ function Legend() {
     ...Object.entries(FILL).map(([status, color]) => [DELIVERABLE_STATUS[status], { bgcolor: color }]),
     ['Overdue (red border)', { border: 2, borderColor: 'error.main' }],
     ['Blocked (striped)', { bgcolor: 'grey.500', backgroundImage: STRIPES }],
-    ['Longest chain (outlined)', { bgcolor: 'grey.500', boxShadow: (t) => `0 0 0 2px ${t.palette.text.primary}` }],
+    ['Longest chain (outlined)', { bgcolor: 'grey.500', boxShadow: (t) => `0 0 0 2px ${(t.vars ?? t).palette.text.primary}` }],
   ]
   return (
     <Box component="ul" aria-label="Legend" sx={{ listStyle: 'none', p: 0, m: 0, mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
@@ -85,6 +89,7 @@ function Legend() {
 
 /** Desktop and tablet: a Gantt-style chart on a shared date axis. */
 function Chart({ chain, rows, today, labelWidth }) {
+  const motion = useMotion()
   const span = spanOf(rows.map((r) => r.node))
   const ticks = axisTicks(span)
   const rowOf = new Map(rows.map((r, i) => [r.node.id, i]))
@@ -145,7 +150,7 @@ function Chart({ chain, rows, today, labelWidth }) {
               <Box component="path" key={`${e.from}>${e.to}`} data-edge={`${e.from}>${e.to}`}
                 d={`M ${x1} ${y1} H ${bend} V ${y2} H ${x2}`} fill="none" vectorEffect="non-scaling-stroke"
                 strokeWidth={onChain ? 2.5 : 1.5}
-                sx={{ stroke: (t) => (onChain ? t.palette.text.primary : t.palette.text.disabled) }} />
+                sx={{ stroke: (t) => (onChain ? (t.vars ?? t).palette.text.primary : (t.vars ?? t).palette.text.disabled) }} />
             )
           })}
         </Box>
@@ -162,13 +167,13 @@ function Chart({ chain, rows, today, labelWidth }) {
             )}>
               <Box role="img" tabIndex={0} aria-label={sentence} data-bar={node.id}
                 style={{ left: `${left}%`, width: `max(${width}%, 6px)`, top: i * ROW + 10 }}
-                sx={{
+                sx={[{
                   position: 'absolute', height: ROW - 20, borderRadius: 1, bgcolor: FILL[node.status] ?? 'grey.500',
                   backgroundImage: flags.blocked ? STRIPES : 'none',
                   border: flags.overdue ? 2 : 0, borderColor: 'error.main',
-                  boxShadow: flags.onChain ? (t) => `0 0 0 2px ${t.palette.text.primary}` : 'none',
+                  boxShadow: flags.onChain ? (t) => `0 0 0 2px ${(t.vars ?? t).palette.text.primary}` : 'none',
                   '&:focus-visible': { outline: 3, outlineColor: 'primary.main', outlineOffset: 3 },
-                }} />
+                }, motion('grow', i)]} />
             </Tooltip>
           )
         })}

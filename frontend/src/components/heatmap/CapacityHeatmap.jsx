@@ -11,6 +11,7 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { toneSx } from '../../theme'
 import { formatWeek, formatWeekShort } from '../../pages/format'
+import { useMotion } from '../motion/motion'
 import { HEAT_LEVELS, breakdown, cellLabel, heatLevel } from './heatScale'
 
 /** Fill and text per band; every pair is a theme token pair that passes 4.5:1. */
@@ -50,6 +51,7 @@ export function HeatLegend() {
 export default function CapacityHeatmap({ weeks, people, isPhone = false }) {
   const [active, setActive] = useState({ row: 0, col: 0 })
   const grid = useRef(null)
+  const motion = useMotion()
 
   function move(event) {
     const step = MOVES[event.key]
@@ -81,7 +83,7 @@ export default function CapacityHeatmap({ weeks, people, isPhone = false }) {
         </TableHead>
         <TableBody>
           {people.map((person, row) => (
-            <TableRow key={person.id}>
+            <TableRow key={person.id} sx={motion('fade', row)}>
               <TableCell component="th" scope="row" sx={sticky}>{person.name}</TableCell>
               {weeks.map((week, col) => {
                 const w = person.weeks[col] ?? { week_start: week, total_hours: 0, projects: [], other_hours: 0 }

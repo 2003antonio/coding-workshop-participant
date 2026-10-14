@@ -21,6 +21,7 @@ import { LoadState } from '../components/PageState'
 import ProjectBudgetSection, { ProjectBudgetBar } from '../components/ProjectBudgetSection'
 import ProjectFormDialog from '../components/ProjectFormDialog'
 import StatusChip from '../components/StatusChip'
+import { useMotion } from '../components/motion/motion'
 import DependenciesSection from '../components/timeline/DependenciesSection'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
@@ -32,6 +33,7 @@ export default function ProjectDetailPage() {
   const { user, role } = useAuth()
   const api = useApi()
   const { isPhone } = useBreakpoint()
+  const motion = useMotion()
   const [tab, setTab] = useState('deliverables')
   const [archiving, setArchiving] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -113,7 +115,8 @@ export default function ProjectDetailPage() {
                   ))}
                 </Tabs>
               </Paper>
-              <Box key={version} role="tabpanel" id={`panel-${current}`} aria-labelledby={`tab-${current}`}>
+              <Box key={`${version}-${current}`} role="tabpanel" id={`panel-${current}`} aria-labelledby={`tab-${current}`}
+                sx={motion('enter')}>
                 {current === 'deliverables' && <DeliverablesSection project={project} canEdit={canEdit} />}
                 {current === 'people' && <AllocationsSection project={project} canEdit={canEdit} role={role} />}
                 {current === 'budget' && <ProjectBudgetSection project={project} role={role} />}
