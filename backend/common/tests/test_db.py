@@ -45,11 +45,27 @@ def _new_connection(settings):
 # =====================================================================
 # Migrations
 # =====================================================================
+ALL_VERSIONS = ["001", "002", "003", "004", "005"]
+
+
 def test_migrations_apply_once_and_rerun_is_a_no_op(fresh_schema):
-    assert runner.run_migrations() == ["001"]
+    assert runner.run_migrations() == ALL_VERSIONS
     assert runner.run_migrations() == []
-    assert [r["version"] for r in db.query("SELECT version FROM schema_migrations")] == ["001"]
-    assert {"employees", "refresh_tokens", "audit_log", "schema_migrations"} <= _table_names()
+    versions = db.query("SELECT version FROM schema_migrations ORDER BY version")
+    assert [r["version"] for r in versions] == ALL_VERSIONS
+    assert {"employees", "refresh_tokens", "audit_log", "schema_migrations", "teams", "projects",
+            "deliverables", "deliverable_dependencies", "allocations"} <= _table_names()
+
+
+def test_later_migrations_apply_on_top_of_an_existing_001_database(fresh_schema, monkeypatch):
+    # A database deployed with only 001 (the previous release) gets 002-005 added.
+    everything = runner._discover_migrations()
+    monkeypatch.setattr(runner, "_discover_migrations", lambda: everything[:1])
+    assert runner.run_migrations() == ["001"]
+    _insert_employee()
+    monkeypatch.setattr(runner, "_discover_migrations", lambda: everything)
+    assert runner.run_migrations() == ALL_VERSIONS[1:]
+    assert db.query_one("SELECT team_id FROM employees") == {"team_id": None}
 
 
 def test_two_migration_runners_at_once_do_not_conflict(fresh_schema, test_database):
@@ -89,8 +105,8 @@ def test_two_migration_runners_at_once_do_not_conflict(fresh_schema, test_databa
     blocker.close()
 
     assert errors == []
-    assert sorted(results) == [[], ["001"]]
-    assert db.query_one("SELECT count(*) AS n FROM schema_migrations")["n"] == 1
+    assert sorted(results) == [[], ALL_VERSIONS]
+    assert db.query_one("SELECT count(*) AS n FROM schema_migrations")["n"] == len(ALL_VERSIONS)
 
 
 # =====================================================================
@@ -120,6 +136,63 @@ def test_blank_job_title_is_rejected(migrated_db, job_title):
     with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
         _insert_employee(job_title=job_title)
     _assert_db_error(exc_info, "23514", "employees_job_title_check")
+
+
+def _team(lead_id, name="Platform", archived=False):
+    return db.query_one(
+        "INSERT INTO teams (name, lead_id, archived_at) VALUES (%s, %s, CASE WHEN %s THEN now() END) "
+        "RETURNING id", (name, lead_id, archived))
+
+
+def _project(team_id, start="2026-11-02", end="2026-12-31"):
+    return db.query_one(
+        "INSERT INTO projects (team_id, name, start_date, end_date) VALUES (%s, 'P', %s, %s) "
+        "RETURNING id", (team_id, start, end))
+
+
+def test_active_team_names_are_unique_in_any_case_but_archived_ones_can_be_reused(migrated_db):
+    lead = _insert_employee(role="manager")["id"]
+    _team(lead, "Old", archived=True)
+    _team(lead, "Old")
+    with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
+        _team(lead, "OLD")
+    _assert_db_error(exc_info, "23505", "uq_teams_name_lower_active")
+
+
+def test_project_dates_must_be_in_order(migrated_db):
+    team = _team(_insert_employee(role="manager")["id"])["id"]
+    with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
+        _project(team, start="2026-12-01", end="2026-11-01")
+    _assert_db_error(exc_info, "23514", "projects_check")
+
+
+def test_a_deliverable_cannot_depend_on_itself(migrated_db):
+    project = _project(_team(_insert_employee(role="manager")["id"])["id"])["id"]
+    deliverable = db.query_one(
+        "INSERT INTO deliverables (project_id, name, start_date, due_date) "
+        "VALUES (%s, 'D', '2026-11-02', '2026-11-03') RETURNING id", (project,))["id"]
+    with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
+        db.execute("INSERT INTO deliverable_dependencies VALUES (%s, %s)", (deliverable, deliverable))
+    _assert_db_error(exc_info, "23514", "deliverable_dependencies_check")
+
+
+def test_done_deliverables_need_completed_at(migrated_db):
+    project = _project(_team(_insert_employee(role="manager")["id"])["id"])["id"]
+    with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
+        db.execute("INSERT INTO deliverables (project_id, name, start_date, due_date, status) "
+                   "VALUES (%s, 'D', '2026-11-02', '2026-11-03', 'done')", (project,))
+    _assert_db_error(exc_info, "23514", "deliverables_check1")
+
+
+@pytest.mark.parametrize("hours", [0, 41])
+def test_allocation_hours_stay_within_1_to_40(migrated_db, hours):
+    employee = _insert_employee(role="manager")["id"]
+    project = _project(_team(employee)["id"])["id"]
+    with pytest.raises(pg8000.dbapi.DatabaseError) as exc_info:
+        db.execute("INSERT INTO allocations (employee_id, project_id, hours_per_week, start_date, "
+                   "end_date, created_by) VALUES (%s, %s, %s, '2026-11-02', '2026-11-03', %s)",
+                   (employee, project, hours, employee))
+    _assert_db_error(exc_info, "23514", "allocations_hours_per_week_check")
 
 
 def test_sql_injection_looking_string_is_stored_as_plain_data(migrated_db):

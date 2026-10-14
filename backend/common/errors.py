@@ -4,7 +4,8 @@ Every failure is an ApiError (or subclass). The response layer renders it as:
 
     {"error": {"code": "<machine_code>", "message": "<human message>"}}
 
-Messages are safe to show clients; nothing sensitive goes in them.
+A few errors add a "details" object (e.g. the weeks over the 40-hour limit).
+Messages and details are safe to show clients; nothing sensitive goes in them.
 """
 
 
@@ -13,16 +14,20 @@ class ApiError(Exception):
     code = "internal_error"
     message = "Internal server error."
 
-    def __init__(self, message=None, code=None, status_code=None):
+    def __init__(self, message=None, code=None, status_code=None, details=None):
         self.message = message or self.message
         if code is not None:
             self.code = code
         if status_code is not None:
             self.status_code = status_code
+        self.details = details
         super().__init__(self.message)
 
     def to_dict(self):
-        return {"error": {"code": self.code, "message": self.message}}
+        error = {"code": self.code, "message": self.message}
+        if self.details is not None:
+            error["details"] = self.details
+        return {"error": error}
 
 
 class BadRequest(ApiError):
