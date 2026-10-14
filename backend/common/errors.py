@@ -47,3 +47,9 @@ class NotFound(ApiError):
     status_code = 404
     code = "not_found"
     message = "Not found."
+
+
+class Conflict(ApiError):
+    status_code = 409
+    code = "conflict"
+    message = "That conflicts with the current state."

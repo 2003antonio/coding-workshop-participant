@@ -3,7 +3,8 @@
 authenticate_request() turns the Bearer access token into the employee's
 DATABASE row, so the role used for every decision always comes from the
 database, never from the token. require_role() denies by default: access is
-granted only when the employee's role is explicitly listed.
+granted only when the employee's role is explicitly listed. require_min_role()
+grants a role and every role above it in ROLE_ORDER.
 """
 
 import uuid
@@ -13,6 +14,10 @@ from common import audit, auth, db
 from common.errors import Forbidden, Unauthorized
 
 VALID_ROLES = ("admin", "manager", "employee")
+
+# Lowest to highest. A role may do everything the roles before it may do.
+ROLE_ORDER = ("employee", "manager", "admin")
+_RANK = {role: rank for rank, role in enumerate(ROLE_ORDER)}
 
 _INVALID = ("Invalid token.", "invalid_token")
 
@@ -69,5 +74,30 @@ def require_role(employee: Optional[dict], *allowed_roles: str) -> str:
         raise Unauthorized()
     role = employee.get("role")
     if role not in VALID_ROLES or role not in allowed_roles:
+        raise Forbidden()
+    return role
+
+
+def require_min_role(employee: Optional[dict], min_role: str) -> str:
+    """Ensure the employee's role is min_role or higher in ROLE_ORDER.
+
+    Args:
+        employee: The row returned by authenticate_request, or None.
+        min_role: The lowest role permitted for this route.
+
+    Returns:
+        The employee's role.
+
+    Raises:
+        ValueError: min_role is not a known role (a bug in the route, never user input).
+        Unauthorized: No employee.
+        Forbidden: Unknown role, or a role below min_role.
+    """
+    if min_role not in _RANK:
+        raise ValueError(f"Unknown minimum role: {min_role!r}")
+    if not employee or not isinstance(employee, dict):
+        raise Unauthorized()
+    role = employee.get("role")
+    if role not in _RANK or _RANK[role] < _RANK[min_role]:
         raise Forbidden()
     return role
