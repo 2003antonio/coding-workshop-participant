@@ -90,15 +90,17 @@ def _project_view(row: dict) -> dict:
 
 
 def list_projects(actor: dict, include_archived: bool, team_id: Optional[str],
-                  status: Optional[str]) -> list:
+                  status: Optional[str], q: Optional[str] = None) -> list:
+    """Visible projects, narrowed by the filters. The visibility filter is always
+    applied in the same query, so q can only narrow, never reveal."""
     _include_archived_allowed(actor, include_archived)
     actor_id = str(actor["id"])
     if actor["role"] == "admin":
-        rows = repository.list_projects(include_archived, team_id, status)
+        rows = repository.list_projects(include_archived, team_id, status, q=q)
     elif actor["role"] == "manager":
-        rows = repository.list_projects(include_archived, team_id, status, lead_id=actor_id)
+        rows = repository.list_projects(include_archived, team_id, status, lead_id=actor_id, q=q)
     else:
-        rows = repository.list_projects(False, team_id, status, allocated_to=actor_id)
+        rows = repository.list_projects(False, team_id, status, allocated_to=actor_id, q=q)
     return [_project_view(row) for row in rows]
 
 

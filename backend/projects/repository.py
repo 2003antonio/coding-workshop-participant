@@ -29,13 +29,27 @@ _DELIVERABLE_COLUMNS = (
 # =====================================================================
 # Projects
 # =====================================================================
+def _contains_pattern(text: str) -> str:
+    """A LIKE pattern matching `text` anywhere, with the wildcards in it escaped.
+
+    The escape character is a backslash (see ESCAPE in list_projects), so a
+    search for "50%" matches only a literal "50%".
+    """
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return "%" + escaped + "%"
+
+
 def list_projects(include_archived: bool, team_id: Optional[str], status: Optional[str],
-                  lead_id: Optional[str] = None, allocated_to: Optional[str] = None) -> list:
+                  lead_id: Optional[str] = None, allocated_to: Optional[str] = None,
+                  q: Optional[str] = None) -> list:
     """Projects ordered by start date then name.
 
     lead_id keeps only projects of teams that person leads; allocated_to only
-    projects where that person has an active allocation.
+    projects where that person has an active allocation. q keeps projects whose
+    name or description contains it (any case). Every filter is ANDed, so a
+    search never widens what the visibility filters allow.
     """
+    pattern = _contains_pattern(q) if q is not None else None
     return db.query(
         _PROJECT_SELECT
         + "WHERE (%s OR p.archived_at IS NULL) "
@@ -44,9 +58,11 @@ def list_projects(include_archived: bool, team_id: Optional[str], status: Option
           "AND (CAST(%s AS uuid) IS NULL OR t.lead_id = %s) "
           "AND (CAST(%s AS uuid) IS NULL OR EXISTS (SELECT 1 FROM allocations a "
           "     WHERE a.project_id = p.id AND a.employee_id = %s AND a.archived_at IS NULL)) "
+          "AND (CAST(%s AS text) IS NULL "
+          "     OR p.name ILIKE %s ESCAPE '\\' OR p.description ILIKE %s ESCAPE '\\') "
           "ORDER BY p.start_date, lower(p.name), p.id",
         (include_archived, team_id, team_id, status, status, lead_id, lead_id,
-         allocated_to, allocated_to),
+         allocated_to, allocated_to, pattern, pattern, pattern),
     )
 
 

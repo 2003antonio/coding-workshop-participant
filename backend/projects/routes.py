@@ -13,6 +13,7 @@ SERVICE_NAME = "projects"
 
 _MAX_NAME = 200
 _MAX_DESCRIPTION = 2000
+_MAX_SEARCH = 100
 _PROJECT_CREATE = ("team_id", "name", "description", "status", "start_date", "end_date")
 _PROJECT_UPDATE = _PROJECT_CREATE
 _DELIVERABLE_CREATE = ("name", "description", "start_date", "due_date", "depends_on")
@@ -67,6 +68,17 @@ def _depends_on(data: dict, required: bool) -> list:
     return [validation.parse_uuid(v) for v in value]
 
 
+def _search(query: dict):
+    """The optional q search text: trimmed, at most 100 characters; empty means no search."""
+    value = query.get("q")
+    if value is None:
+        return None
+    value = value.strip()
+    if len(value) > _MAX_SEARCH:
+        raise BadRequest(f"Query parameter q must be at most {_MAX_SEARCH} characters.")
+    return value or None
+
+
 def _ids(params: dict) -> tuple:
     return validation.path_uuid(params), validation.path_uuid(params, "deliverable_id")
 
@@ -82,7 +94,8 @@ def list_projects(params: dict, query: dict, body: object, headers: dict) -> dic
     status = query.get("status")
     if status is not None and status not in services.PROJECT_STATUSES:
         raise BadRequest("Query parameter status is not a valid status.")
-    return responses.ok({"projects": services.list_projects(actor, include_archived, team_id, status)})
+    return responses.ok({"projects": services.list_projects(actor, include_archived, team_id, status,
+                                                            _search(query))})
 
 
 def get_project(params: dict, query: dict, body: object, headers: dict) -> dict:
