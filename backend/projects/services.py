@@ -175,22 +175,24 @@ def archive_project(actor: dict, project_id: str) -> dict:
 
 
 def project_budget(actor: dict, project_id: str) -> dict:
-    """Planned, used and remaining cost from the project's allocations.
+    """Committed and used-to-date cost from the project's allocations, plus the
+    typed-in planned budget.
 
     Admin and the project's manager only. Per-person lines (with hourly rates)
-    are admin-only. A manager gets totals only when at least
+    are admin-only. A manager gets the cost totals only when at least
     MIN_AGGREGATE_GROUP distinct people are allocated; otherwise nulls.
+    planned_budget is not salary-derived, so it is always shown to them.
     """
     row = _visible_project(actor, project_id)
     if not _can_manage(actor, row):
         raise Forbidden()
     today = weeks.today()
-    planned = used = Decimal(0)
+    committed = used = Decimal(0)
     lines, people = [], set()
     for alloc in repository.budget_allocations(project_id):
         cost = budget.allocation_cost(alloc["hours_per_week"], alloc["salary"],
                                       alloc["start_date"], alloc["end_date"], today)
-        planned += cost["planned"]
+        committed += cost["planned"]
         used += cost["used"]
         people.add(str(alloc["employee_id"]))
         lines.append({
@@ -199,15 +201,15 @@ def project_budget(actor: dict, project_id: str) -> dict:
             "hours_per_week": alloc["hours_per_week"],
             "weeks": cost["weeks"],
             "hourly_rate": budget.money(budget.hourly_rate(alloc["salary"])),
-            "planned": budget.money(cost["planned"]),
-            "used": budget.money(cost["used"]),
+            "committed_cost": budget.money(cost["planned"]),
+            "used_cost_to_date": budget.money(cost["used"]),
         })
     hidden = budget.is_hidden(actor["role"], len(people))
     result = {
         "project_id": project_id,
-        "planned": None if hidden else budget.money(planned),
-        "used": None if hidden else budget.money(used),
-        "remaining": None if hidden else budget.money(planned - used),
+        "planned_budget": budget.money(row["planned_budget"]),
+        "committed_cost": None if hidden else budget.money(committed),
+        "used_cost_to_date": None if hidden else budget.money(used),
         "allocated_people": len(people),
         "hidden_reason": budget.hidden_reason(hidden),
     }
