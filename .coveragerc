@@ -1,0 +1,5 @@
+# Coverage counts real code only: not tests, not the per-service common/ copies.
+[run]
+omit =
+    */tests/*
+    backend/*/common/*

@@ -256,3 +256,6 @@ tfplan
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
+
+# Per-service copies of backend/common (made by scripts/sync-common.sh; edit backend/common only)
+backend/*/common/
