@@ -11,10 +11,10 @@ import {
 // What each account opens: one project and one team it can see (none for hal),
 // and the project tabs it should get there.
 const PLAN = {
-  admin: { project: 'Billing v2', tabs: ['Deliverables', 'People', 'Budget'], team: 'Platform' },
-  marta: { project: 'Billing v2', tabs: ['Deliverables', 'People', 'Budget'], team: 'Platform' },
-  ken: { project: 'Data lake', tabs: ['Deliverables', 'People', 'Budget'], team: 'Data' },
-  ana: { project: 'Billing v2', tabs: ['Deliverables', 'People'], team: 'Platform' },
+  admin: { project: 'Billing v2', tabs: ['Deliverables', 'People', 'Budget', 'Dependencies'], team: 'Platform' },
+  marta: { project: 'Billing v2', tabs: ['Deliverables', 'People', 'Budget', 'Dependencies'], team: 'Platform' },
+  ken: { project: 'Data lake', tabs: ['Deliverables', 'People', 'Budget', 'Dependencies'], team: 'Data' },
+  ana: { project: 'Billing v2', tabs: ['Deliverables', 'People', 'Dependencies'], team: 'Platform' },
   hal: {},
 }
 
