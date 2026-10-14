@@ -252,7 +252,8 @@ Known limit: comparing totals before and after one person joins or leaves can st
 **Project budget** — `GET /api/projects/{id}/budget` (admin, the project's manager):
 ```json
 { "project_id": "uuid", "planned_budget": 20000.00, "committed_cost": 13000.00,
-  "used_cost_to_date": 6800.00, "allocated_people": 3, "hidden_reason": null,
+  "used_cost_to_date": 6800.00, "percent_used": 34.0, "over_budget": false,
+  "allocated_people": 3, "hidden_reason": null,
   "lines": [{"allocation_id": "uuid", "employee": {"id": "uuid", "name": "Bo"},
              "hours_per_week": 20, "weeks": 7, "hourly_rate": 50.00,
              "committed_cost": 7000.00, "used_cost_to_date": 2000.00}] }
@@ -262,10 +263,15 @@ Known limit: comparing totals before and after one person joins or leaves can st
   in report 7). `used_cost_to_date` = cost of the weeks up to and including the current week.
 - `planned_budget` = the typed-in budget (§4), or `null`. It is not salary-derived, so admin
   and the project's manager always see it, even when the costs are hidden.
+- `percent_used` and `over_budget`: same definitions as report 7 (§8) —
+  `used_cost_to_date / planned_budget × 100` (one decimal, `null` when there is no planned
+  budget or it is 0) and `committed_cost > planned_budget` (`null` when there is no planned
+  budget).
 - `lines` is **admin only**, ordered by person then start date. Managers get totals only, and
-  only when `allocated_people` is at least `MIN_AGGREGATE_GROUP`; otherwise `committed_cost`
-  and `used_cost_to_date` are `null` with `"hidden_reason": "below_min_group"` (a manager sees
-  the hours, so a small total would reveal a rate).
+  only when `allocated_people` is at least `MIN_AGGREGATE_GROUP`; otherwise `committed_cost`,
+  `used_cost_to_date`, `percent_used` and `over_budget` are all `null` with
+  `"hidden_reason": "below_min_group"` (a manager sees the hours, so a small total would
+  reveal a rate, and the percentage or flag would reveal the total).
 
 ## 8. Reports (`/api/reports`, all `GET`)
 
