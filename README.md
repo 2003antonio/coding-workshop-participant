@@ -1,3 +1,207 @@
+# ACME Project Tracker
+
+I built this for the Citi coding workshop: a web app where ACME Inc. plans
+projects, splits them into deliverables, assigns people by the hour, and keeps
+an eye on budgets, without letting anyone see a colleague's pay.
+
+## What this is
+
+1. An admin sets up people, teams and their leads.
+2. A manager (a team lead) creates projects for their team, breaks them into deliverables with dependencies, and assigns people for a number of hours per week.
+3. The app refuses anything that would put a person over 40 hours in a week, or make the dependencies go round in a loop, and says which weeks or which deliverables.
+4. Seven reports show progress, projects at risk, who is working where, overdue work, people near capacity, the dependency chain, and budget used against plan.
+5. Salaries stay private: only an admin sees them, and group totals for fewer than 3 people are hidden from everyone else.
+
+The demo runs locally on my laptop (see [How to run locally](#how-to-run-locally)).
+
+## Screenshots
+
+<!-- FINAL: add 3-4 screenshots from docs/screenshots/ (home, project detail, reports, phone menu) after the new look is captured by `npm run e2e`. -->
+
+## What it does, by role
+
+Admin includes everything a manager can do, and a manager everything an employee can do.
+The server checks the role on every request; hiding a button in the UI is only a courtesy.
+
+| | Admin | Manager | Employee |
+|---|---|---|---|
+| Projects they see | All | Projects of the teams they lead | Projects they are assigned to |
+| Change projects, deliverables, assignments | All | Their own teams' projects; they assign only people from their team | Read only |
+| Salaries, hourly rates, per-person costs | Yes (the only role) | Never | Never |
+| Budgets | All, in full | Project and team totals, hidden when fewer than 3 people are in the group | None |
+| Employees page | Add, edit, archive, set team | Read only, no salaries | Not shown |
+| Teams | Create, choose the lead, add or remove members, archive | See the teams they lead | See their own team |
+| Reports | All 7 | All 7, limited to their teams | 4 of 7: project status, resources (their own hours), deliverables, dependencies |
+
+Nothing is ever deleted: records are archived, and changes are written to an audit log.
+
+## Architecture
+
+Calls go in one direction on each side. A screen never talks to the database,
+and only one layer on each side does the talking.
+
+| Layer | Where | What it does |
+|---|---|---|
+| Page / component | `frontend/src/pages/`, `frontend/src/components/` | What you see (React + Material UI). |
+| Hooks and session | `frontend/src/auth/`, `frontend/src/hooks/` | Who is signed in, the access token, loading and error state (`useLoad`). |
+| Service | `frontend/src/services/*.js` | The only files that call `fetch`; one function per endpoint. |
+| API contract | `docs/api-contract.md` | The agreed list of endpoints and JSON shapes. The source of truth. |
+| Entry point | `backend/<service>/function.py` | The Lambda handler. |
+| Routes | `backend/<service>/routes.py` | Reads the request and checks the caller's role. |
+| Rules | `backend/<service>/services.py` | The business rules (40-hour limit, loops, budget hiding). |
+| Repository | `backend/<service>/repository.py` | The only place SQL is written. |
+| Shared kernel | `backend/common/` | Database, tokens, roles, validation, errors, audit, budget maths, week maths, migrations. |
+
+```
+coding-workshop-participant/
+├─ backend/              one folder per backend service, each deployed as its own Lambda
+│  ├─ auth/              sign in, refresh, sign out, "who am I"
+│  ├─ employees/         people, roles and salaries
+│  ├─ teams/             teams, leads, members, team budget
+│  ├─ projects/          projects, deliverables, dependencies, project budget
+│  ├─ allocations/       who works on what, hours per week, the 40-hour rule
+│  ├─ reports/           the seven read-only reports
+│  ├─ common/            the shared kernel, including migrations/ (001 to 006)
+│  └─ _examples/         workshop starter code (not deployed)
+├─ frontend/
+│  ├─ src/               the React app (docs/frontend-guide.md explains every folder)
+│  └─ e2e/               Playwright browser tests: a tour per demo account, then real flows
+├─ scripts/              local tools: dev server, demo seed, admin seed, role smoke test, sync-common.sh
+├─ docs/                 api-contract.md, frontend-guide.md, screenshots/, the workshop guides
+├─ infra/                Terraform for AWS (from the workshop)
+├─ bin/                  deploy and setup scripts (from the workshop)
+└─ data/                 workshop extras for the data-engineering track (unused by the app)
+```
+
+## How to run locally
+
+**Prerequisites:** Node.js (I use 24), Python (I use 3.13) with a virtual
+environment in `.venv` at the repo root, and PostgreSQL on this machine (I run
+it in a Docker container named `acme-postgres`).
+
+**1. Settings.** Create `.env.local` in the repo root (git ignores it). It needs these names:
+
+| Variable | What it is |
+|---|---|
+| `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_NAME`, `POSTGRES_USER`, `POSTGRES_PASS` | The local database. |
+| `IS_LOCAL` | `true` locally (outside it, the database connection requires TLS). |
+| `DEMO_ADMIN_PASSWORD`, `DEMO_MANAGER_PASSWORD`, `DEMO_EMPLOYEE_PASSWORD` | Passwords for the demo accounts, at least 12 characters each. |
+| `SEED_EMAIL`, `SEED_NAME`, `SEED_JOB_TITLE`, `SEED_PASSWORD` | Optional, for `scripts/seed_admin.py` (it asks for any that are missing). |
+
+**2. Python packages** (in the virtual environment): each service's
+`requirements.txt` (`PyJWT`, `pg8000`), plus `pytest` and `pytest-cov` for the tests.
+
+**3. Demo data.** Creates 1 admin, 2 managers, 8 employees, 2 teams, 3 projects,
+deliverables and assignments. `--reset` starts it clean. It refuses any
+database that isn't on localhost.
+
+```powershell
+.venv\Scripts\python.exe scripts\seed_demo.py --reset
+```
+
+**4. Backend.** Serves every service on http://localhost:3001. Pending database migrations run on the first request.
+
+```powershell
+.venv\Scripts\python.exe scripts\dev_server.py
+```
+
+**5. Frontend.** In a second terminal, then open http://localhost:3000:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+**6. Tests.**
+
+```powershell
+.venv\Scripts\python.exe -m pytest        # backend, with coverage (fails under 80%)
+cd frontend
+npm run coverage                          # frontend unit tests, with coverage (fails under 80%)
+npm run lint
+npm run build
+```
+
+**7. End-to-end tests.** Re-seeds the demo, starts both servers if they aren't
+running, signs in as each demo account in a real browser, and saves screenshots to `docs/screenshots/`.
+
+```powershell
+cd frontend
+npx playwright install chromium   # once
+npm run e2e
+```
+
+**8. Role smoke test.** With the backend running on a seeded database, checks
+the rules that matter most (salary privacy, group size, the 40-hour rule,
+loops, visibility) through the API and prints one PASS or FAIL line per check.
+
+```powershell
+.venv\Scripts\python.exe scripts\smoke_roles.py
+```
+
+## How to deploy to AWS
+
+**Honest status: the cloud demo is unverified.** I ran the workshop's deploy
+scripts. They got as far as creating the database and then failed on the
+shared account's cluster quota (40 of 40 clusters already in use in
+`us-east-2`). Nothing after that step has run in AWS.
+
+The steps, as the workshop scripts expect them:
+
+1. `./scripts/sync-common.sh` copies `backend/common/` into every service folder. **Run it first, every time.** The copies are git-ignored, and a Lambda without them fails to start.
+2. `./bin/deploy-backend.sh aws`: Terraform creates the network, the database, one Lambda per service folder (found by its `requirements.txt`) and the CloudFront routes `/api/<service>*`.
+3. `./bin/deploy-frontend.sh` builds the frontend and uploads it to S3 behind CloudFront.
+
+Deploy all six services together. The newer services need migrations 002 to 006,
+and the first cold start of any service applies pending migrations (so the
+database user needs the right to change tables).
+
+Known blockers to check once a cluster is available:
+
+- **sync-common.sh first** (above).
+- **The database name.** Terraform names the database after the project with the dashes removed, and passes it to every Lambda as `POSTGRES_NAME`. Anything run by hand (a seed, a migration) must use the same name.
+- **The `Authorization` header.** Every request carries `Authorization: Bearer <token>`. It must reach the Lambda through CloudFront unchanged. Not yet tested.
+- **The API address.** The frontend calls `http://localhost:3001` unless `VITE_API_URL` is set when it is built. For AWS it has to point at the CloudFront address. (`frontend/.env.sample` still names old `REACT_APP_*` variables, which Vite ignores.)
+- **Lambda memory.** Terraform gives each Lambda 128 MB. Password checking uses scrypt with up to 64 MiB, so sign-in may need more memory. Not measured.
+- **No admin on a fresh cloud database.** There is no public way to create the first account. `scripts/seed_admin.py --allow-remote` can do it, but only from a machine that can reach the database inside its private network.
+
+## Tests
+
+<!-- FINAL: backend (pytest) tests and coverage, frontend (vitest) tests and coverage, E2E result, role smoke result, lint, build size. Re-run everything on this laptop before filling in. -->
+
+- **Backend:** pytest against a throwaway local database, per service and for the shared kernel.
+- **Frontend:** Vitest + Testing Library. Pages run against a fake backend (`frontend/src/test/fakeApiServer.js`) that follows the API contract and its role rules. Every role, server refusals and phone widths are tested. One test checks that every status colour reaches a 4.5:1 contrast ratio in light and dark.
+- **End-to-end:** Playwright tours every page as each demo account, checks that no salary, password or token appears for non-admins, then runs one real flow per role.
+- **Role smoke:** `scripts/smoke_roles.py` against the running backend.
+
+## Trade-offs I made
+
+- **The token signing key is derived from the database password.** It saves managing another secret, but every service must share the same `POSTGRES_PASS`, and anyone who knows the database password could make tokens.
+- **The refresh token is kept in the browser's `localStorage`.** The access token stays in memory only. A script-injection bug on the page could read the refresh token.
+- **No per-IP rate limiting.** Repeated failed sign-ins are not slowed down by address.
+- **Hiding small groups doesn't stop every leak.** Budgets of groups under 3 people are hidden, but comparing a team's total before and after one person joins or leaves can still reveal that person's pay.
+- **One visibility rule for managers:** a manager sees only the projects of teams they lead. If an admin assigns them to another team's project, they can't see it, but the hours still count toward their 40.
+- **Simple cost maths:** hourly rate = annual salary / 2080, using today's salary (no history). A partial week counts as a full week.
+- **The shared kernel is copied, not packaged.** There is one source in `backend/common/`, copied into each Lambda by `sync-common.sh`.
+
+## Known gaps
+
+As of October 14, 2026:
+
+- No "My work" page yet: an employee sees their hours project by project, not in one view across all their projects.
+- The project search box filters in the browser. It doesn't use the API's `?q=` search.
+- The audit log is written, but no screen shows it.
+- Lists are not paginated. The app is sized for demo data.
+- The cloud deploy is unverified (see above). `package-lock.json` is git-ignored, so installs are not pinned.
+
+## How to keep expanding the frontend
+
+See [docs/frontend-guide.md](./docs/frontend-guide.md): how the frontend is
+organised, and how to add a page, an API call, a component and a test.
+
+## The original workshop brief
+
 # Coding Workshop
 
 The goal of this coding workshop is to enable and assess the hands-on skills
@@ -71,40 +275,6 @@ web application that meets the requirements outlined above. The application
 will be deployed to a cloud environment and accessible via a web browser.
 Participants will also gain hands-on experience with modern web development
 technologies and best practices.
-
-## Deploy notes
-
-Four new backend services (see [docs/api-contract.md](./docs/api-contract.md)),
-plus a change to `employees`. Each is a Python Lambda that Terraform finds by
-its `requirements.txt` (`infra/locals.tf`), with handler `function.handler` and
-a CloudFront route `/api/<name>*`. No infra changes are needed.
-
-What every service needs on deploy:
-
-* **Shared code copied in:** run `./scripts/sync-common.sh` first, so each
-  service folder gets its own `common/` (never committed).
-* **Python packages:** `PyJWT` and `pg8000` from its `requirements.txt`.
-* **Environment:** the usual `POSTGRES_HOST/PORT/NAME/USER/PASS`. All services
-  must share the same `POSTGRES_PASS`: the access-token key is derived from it.
-  `IS_LOCAL` must not be `true` in the cloud (TLS to the database).
-* **Database rights:** the first cold start of *any* service applies pending
-  migrations (lock-protected, safe to race), so the DB user needs DDL rights.
-
-| Service | Path | Needs | Notes |
-|---|---|---|---|
-| `teams` | `/api/teams` | migration 002 | Uses `DELETE` (remove member); CloudFront already allows it. |
-| `projects` | `/api/projects` | migrations 002–006 | Deliverables live under `/api/projects/{id}/deliverables`. |
-| `allocations` | `/api/allocations` | migrations 002–006 | 40-hour check locks the employee row (`SELECT ... FOR UPDATE`). |
-| `reports` | `/api/reports` | migrations 002–006 | Read-only queries, but still runs migrations on cold start. |
-| `employees` (changed) | `/api/employees` | migration 002 | Redeploy: returns `team_id`, and refuses to demote or archive a team lead. |
-
-Deploy all five together: the old `employees` code keeps working against the
-new schema, but the new services need the tables and columns from 002–006
-(006 adds `projects.planned_budget`).
-
-Local only: `scripts/dev_server.py` serves all services on port 3001, and
-`scripts/seed_demo.py` fills a local database with demo data (passwords from
-`DEMO_ADMIN_PASSWORD`, `DEMO_MANAGER_PASSWORD`, `DEMO_EMPLOYEE_PASSWORD`).
 
 ## Contributing
 
