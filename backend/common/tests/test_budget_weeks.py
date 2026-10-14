@@ -90,3 +90,18 @@ def test_money_rounds_half_up_and_keeps_none():
 def test_percent():
     assert budget.percent(Decimal(1), Decimal(3)) == 33.3
     assert budget.percent(Decimal(5), Decimal(0)) == 0.0
+
+
+def test_percent_of_budget():
+    assert budget.percent_of_budget(Decimal(6800), Decimal(20000)) == 34.0
+    assert budget.percent_of_budget(Decimal(30000), Decimal(20000)) == 150.0
+    assert budget.percent_of_budget(Decimal(5), None) is None
+    assert budget.percent_of_budget(Decimal(5), Decimal(0)) is None
+
+
+def test_over_budget():
+    assert budget.over_budget(Decimal(13000), Decimal(20000)) is False
+    assert budget.over_budget(Decimal(20000), Decimal(20000)) is False
+    assert budget.over_budget(Decimal("20000.01"), Decimal(20000)) is True
+    assert budget.over_budget(Decimal(1), Decimal(0)) is True
+    assert budget.over_budget(Decimal(1), None) is None

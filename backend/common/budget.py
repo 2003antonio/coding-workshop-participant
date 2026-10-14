@@ -65,6 +65,21 @@ def allocation_cost(hours_per_week: int, salary: Decimal, start: datetime.date,
             "planned": weekly * total_weeks, "used": weekly * used_weeks}
 
 
+def percent_of_budget(used: Decimal, planned_budget: Optional[Decimal]) -> Optional[float]:
+    """used / planned budget as a percentage (one decimal, may exceed 100);
+    None when no planned budget is set or it is 0."""
+    if not planned_budget:
+        return None
+    return percent(used, planned_budget)
+
+
+def over_budget(committed: Decimal, planned_budget: Optional[Decimal]) -> Optional[bool]:
+    """Committed cost above the planned budget; None when no planned budget is set."""
+    if planned_budget is None:
+        return None
+    return Decimal(committed) > Decimal(planned_budget)
+
+
 def percent(part: Decimal, whole: Decimal) -> float:
     """part / whole as a percentage with one decimal; 0 when whole is 0."""
     if not whole:

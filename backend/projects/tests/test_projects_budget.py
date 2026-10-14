@@ -45,6 +45,8 @@ def test_admin_gets_lines_and_totals(api, staffed, today):
         "planned_budget": 20000.0,
         "committed_cost": 13000.0,
         "used_cost_to_date": 6800.0,
+        "percent_used": 34.0,
+        "over_budget": False,
         "allocated_people": 3,
         "hidden_reason": None,
         "lines": [   # by person, then start date
@@ -61,6 +63,7 @@ def test_manager_gets_totals_only_at_three_people(api, staffed, today):
     assert resp.status == 200
     assert resp.json == {"project_id": str(staffed["billing"]["id"]), "planned_budget": 20000.0,
                          "committed_cost": 13000.0, "used_cost_to_date": 6800.0,
+                         "percent_used": 34.0, "over_budget": False,
                          "allocated_people": 3, "hidden_reason": None}
 
 
@@ -69,13 +72,51 @@ def test_manager_gets_nulls_below_three_people_but_still_the_planned_budget(api,
     resp = api("GET", budget_path(world["billing"]), as_=world["max"])
     assert resp.json == {"project_id": str(world["billing"]["id"]), "planned_budget": 20000.0,
                          "committed_cost": None, "used_cost_to_date": None,
+                         "percent_used": None, "over_budget": None,
                          "allocated_people": 1, "hidden_reason": "below_min_group"}
 
 
 def test_admin_always_gets_numbers(api, world, today):
     resp = api("GET", budget_path(world["billing"]), as_=world["admin"])
     assert resp.json["committed_cost"] == 7000.0 and resp.json["hidden_reason"] is None
+    # No planned budget: nothing to compare with.
     assert resp.json["planned_budget"] is None
+    assert resp.json["percent_used"] is None and resp.json["over_budget"] is None
+
+
+def _set_budget(db, project, amount):
+    db.execute("UPDATE projects SET planned_budget = %s WHERE id = %s", (amount, str(project["id"])))
+
+
+def test_admin_sees_the_comparison_even_for_one_person(api, world, migrated_db, today):
+    # 7000 committed, 2000 used against a budget of 5000.
+    _set_budget(migrated_db, world["billing"], 5000)
+    resp = api("GET", budget_path(world["billing"]), as_=world["admin"])
+    assert (resp.json["percent_used"], resp.json["over_budget"]) == (40.0, True)
+
+
+def test_a_zero_budget_has_no_percent_but_is_over(api, staffed, migrated_db, today):
+    _set_budget(migrated_db, staffed["billing"], 0)
+    for who in ("admin", "max"):
+        body = api("GET", budget_path(staffed["billing"]), as_=staffed[who]).json
+        assert (body["percent_used"], body["over_budget"]) == (None, True), who
+
+
+def test_manager_over_budget_at_three_people(api, staffed, migrated_db, today):
+    _set_budget(migrated_db, staffed["billing"], 12000)
+    body = api("GET", budget_path(staffed["billing"]), as_=staffed["max"]).json
+    assert (body["percent_used"], body["over_budget"]) == (56.7, True)
+
+
+@pytest.mark.parametrize("amount", [1, 5000, 1000000])
+def test_a_hidden_group_never_gets_percent_or_over_budget(api, world, migrated_db, today, amount):
+    # Whatever the budget, a manager below MIN_AGGREGATE_GROUP learns nothing about the costs.
+    _set_budget(migrated_db, world["billing"], amount)
+    body = api("GET", budget_path(world["billing"]), as_=world["max"]).json
+    assert body["hidden_reason"] == "below_min_group"
+    assert body["percent_used"] is None and body["over_budget"] is None
+    assert body["committed_cost"] is None and body["used_cost_to_date"] is None
+    assert body["planned_budget"] == float(amount)
 
 
 def test_old_names_are_gone(api, staffed, today):

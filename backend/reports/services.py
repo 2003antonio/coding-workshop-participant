@@ -113,13 +113,6 @@ def _project_money(project_ids: list, today: datetime.date) -> dict:
     return money
 
 
-def _over_budget(project: dict, money: dict) -> Optional[bool]:
-    """Committed cost above the typed-in planned budget; None when no budget is set."""
-    if project["planned_budget"] is None:
-        return None
-    return money["planned"] > project["planned_budget"]
-
-
 # =====================================================================
 # 2. At-risk projects
 # =====================================================================
@@ -151,7 +144,7 @@ def at_risk_projects(actor: dict) -> dict:
             reasons.append("dependency_date_conflict")
         if project["status"] == "active" and pid not in staffed:
             reasons.append("unstaffed")
-        if pid in money and _over_budget(project, money[pid]):
+        if pid in money and budget.over_budget(money[pid]["planned"], project["planned_budget"]):
             reasons.append("over_budget")
         if reasons:
             result.append({"id": pid, "name": project["name"],
@@ -344,17 +337,14 @@ def budget_report(actor: dict, team_id: Optional[str]) -> dict:
         # Cost fields come from salaries, so they follow MIN_AGGREGATE_GROUP.
         # The planned budget is typed in, not a salary, so it is always shown.
         hidden = budget.is_hidden(role, len(entry["people"]))
-        percent_used = None
-        if not hidden and planned_budget:
-            percent_used = budget.percent(entry["used"], planned_budget)
         project_rows.append({
             "id": str(project["id"]), "name": project["name"],
             "team": _ref(project, "team_id", "team_name"),
             "planned_budget": budget.money(planned_budget),
             "committed_cost": None if hidden else budget.money(entry["planned"]),
             "used_cost_to_date": None if hidden else budget.money(entry["used"]),
-            "percent_used": percent_used,
-            "over_budget": None if hidden else _over_budget(project, entry),
+            "percent_used": None if hidden else budget.percent_of_budget(entry["used"], planned_budget),
+            "over_budget": None if hidden else budget.over_budget(entry["planned"], planned_budget),
             "hidden_reason": budget.hidden_reason(hidden),
         })
 

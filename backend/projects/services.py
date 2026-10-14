@@ -175,12 +175,13 @@ def archive_project(actor: dict, project_id: str) -> dict:
 
 
 def project_budget(actor: dict, project_id: str) -> dict:
-    """Committed and used-to-date cost from the project's allocations, plus the
-    typed-in planned budget.
+    """Committed and used-to-date cost from the project's allocations, the
+    typed-in planned budget, and how the costs compare with it.
 
     Admin and the project's manager only. Per-person lines (with hourly rates)
     are admin-only. A manager gets the cost totals only when at least
-    MIN_AGGREGATE_GROUP distinct people are allocated; otherwise nulls.
+    MIN_AGGREGATE_GROUP distinct people are allocated; otherwise nulls, and
+    percent_used / over_budget are null too since they would reveal the costs.
     planned_budget is not salary-derived, so it is always shown to them.
     """
     row = _visible_project(actor, project_id)
@@ -205,11 +206,14 @@ def project_budget(actor: dict, project_id: str) -> dict:
             "used_cost_to_date": budget.money(cost["used"]),
         })
     hidden = budget.is_hidden(actor["role"], len(people))
+    planned_budget = row["planned_budget"]
     result = {
         "project_id": project_id,
-        "planned_budget": budget.money(row["planned_budget"]),
+        "planned_budget": budget.money(planned_budget),
         "committed_cost": None if hidden else budget.money(committed),
         "used_cost_to_date": None if hidden else budget.money(used),
+        "percent_used": None if hidden else budget.percent_of_budget(used, planned_budget),
+        "over_budget": None if hidden else budget.over_budget(committed, planned_budget),
         "allocated_people": len(people),
         "hidden_reason": budget.hidden_reason(hidden),
     }
