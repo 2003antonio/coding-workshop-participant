@@ -1,37 +1,28 @@
+import { Suspense } from 'react'
 import CssBaseline from '@mui/material/CssBaseline'
 import { ThemeProvider } from '@mui/material/styles'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
-import EmployeesPage from './pages/EmployeesPage'
-import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
-import ProjectDetailPage from './pages/ProjectDetailPage'
-import ProjectsPage from './pages/ProjectsPage'
-import ReportsPage from './pages/ReportsPage'
-import TeamDetailPage from './pages/TeamDetailPage'
-import TeamsPage from './pages/TeamsPage'
+import { PageSkeleton } from './components/PageState'
+import { PROTECTED_ROUTES, PUBLIC_ROUTES } from './routes'
 import theme from './theme'
 
-/** Routes: /login is public; everything inside <ProtectedRoute> needs a session. */
+/** Routes (routes.jsx): public ones, then everything inside <ProtectedRoute> needs a session. */
 export default function App() {
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={theme} noSsr>
       <CssBaseline />
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:id" element={<ProjectDetailPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/teams/:id" element={<TeamDetailPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<PageSkeleton />}>
+          <Routes>
+            {PUBLIC_ROUTES.map(({ path, Page }) => <Route key={path} path={path} element={<Page />} />)}
+            <Route element={<ProtectedRoute />}>
+              {PROTECTED_ROUTES.map(({ path, Page }) => <Route key={path} path={path} element={<Page />} />)}
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </ThemeProvider>
   )

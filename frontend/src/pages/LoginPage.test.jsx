@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -64,7 +64,7 @@ describe('LoginPage', () => {
     await signIn('ada@acme.test', 'Right-Pass-1')
 
     expect(await screen.findByRole('heading', { name: 'Welcome, Ada Admin' })).toBeInTheDocument()
-    expect(screen.getByText('Admin')).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByText('Admin')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument()
     expect(server.calls[0].body).toEqual({ email: 'ada@acme.test', password: 'Right-Pass-1' })
     // Only the refresh token is persisted; the access token stays in memory.

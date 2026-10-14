@@ -10,6 +10,7 @@
 //   server.calls, server.count(method, path), server.db
 import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
 import { fakeAuthServer, reply } from './fakeAuthServer'
+import { extraRoutes } from './fakeHandlers'
 
 export { reply }
 
@@ -309,7 +310,7 @@ function createApi(db, meId, today) {
   }
 
   // [method, pattern, handler({ body, query, params })]
-  return [
+  const coreRoutes = [
     // ---- employees (the parts pages use) ----
     ['GET', /^\/api\/employees\/$/, ({ query }) => {
       if (me().role === 'employee') return forbidden()
@@ -719,6 +720,10 @@ function createApi(db, meId, today) {
       return reply(200, teamView(team, true))
     }],
   ]
+  // Plug-in routes from fakeHandlers/ also get the data, the signed-in user and today.
+  const context = { db, me, today }
+  const plugged = extraRoutes.map(([method, pattern, handler]) => [method, pattern, (req) => handler({ ...req, ...context })])
+  return [...coreRoutes, ...plugged]
 }
 
 /**
