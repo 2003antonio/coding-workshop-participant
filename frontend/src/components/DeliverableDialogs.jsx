@@ -11,7 +11,7 @@ import { DELIVERABLE_STATUS, formatDate } from '../pages/format'
 import FormDialog from './FormDialog'
 import { DateField } from './ProjectFormDialog'
 
-const MAX_NAME = 200
+export const MAX_NAME = 200
 const MAX_DESCRIPTION = 2000
 const MAX_DEPENDENCIES = 50
 

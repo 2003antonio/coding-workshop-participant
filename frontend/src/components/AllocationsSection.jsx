@@ -11,8 +11,11 @@ import * as allocationService from '../services/allocationService'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { formatDate, formatMoney } from '../pages/format'
+import { messageFor } from '../pages/apiMessages'
+import { detailsSentence } from '../services/errorDetails'
 import ConfirmDialog from './ConfirmDialog'
 import FormDialog from './FormDialog'
+import InlineEditCell from './inline/InlineEditCell'
 import { LoadState } from './PageState'
 import { DateField } from './ProjectFormDialog'
 import ResponsiveTable from './ResponsiveTable'
@@ -119,6 +122,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
   const api = useApi()
   const showCost = canSeeSalaries(role)
   const [notice, setNotice] = useState('')
+  const [problem, setProblem] = useState('') // why an in-place change was undone
   const [dialog, setDialog] = useState(null) // null, { kind: 'assign' } or { kind: 'edit' | 'remove', allocation }
 
   const load = useCallback(
@@ -156,6 +160,21 @@ export default function AllocationsSection({ project, canEdit, role }) {
     result.reload()
   }
 
+  /** Hours changed in place. On a refusal the cell rolls back and this says why (with the weeks over 40 h). */
+  async function saveHours(allocation, hours) {
+    setNotice('')
+    setProblem('')
+    try {
+      await api((token) => allocationService.updateAllocation(token, allocation.id, { hours_per_week: hours }))
+      setNotice(`${allocation.employee.name}'s assignment was updated.`)
+      result.reload()
+    } catch (error) {
+      const details = detailsSentence(error)
+      setProblem(`${allocation.employee.name}: ${messageFor(error)}${details ? ` ${details}.` : ''} The change was undone.`)
+      throw error
+    }
+  }
+
   async function handleRemove() {
     const { allocation } = dialog
     await api((token) => allocationService.archiveAllocation(token, allocation.id))
@@ -181,12 +200,18 @@ export default function AllocationsSection({ project, canEdit, role }) {
         </Typography>
       )}
       {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
+      {problem && <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>}
       {people.status === 'error' && <Alert severity="warning" sx={{ mb: 2 }}>{people.error}</Alert>}
       <LoadState result={result} label="Loading assignments" skeleton="table">
         {(rows) => (
           <ResponsiveTable label="Assignments" rows={rows} empty="No one is assigned yet." columns={[
             { key: 'person', label: 'Person', primary: true, render: (a) => a.employee.name },
-            { key: 'hours', label: 'Hours per week', align: 'right', render: (a) => a.hours_per_week },
+            { key: 'hours', label: 'Hours per week', align: 'right', render: (a) => (
+              <InlineEditCell canEdit={canEdit && !closed} value={String(a.hours_per_week)}
+                what={`hours per week of ${a.employee.name}`} inputProps={{ inputMode: 'numeric' }}
+                validate={(hours) => assignmentErrors({ ...a, hours_per_week: hours }, project).hours_per_week ?? null}
+                onSave={(hours) => saveHours(a, Number(hours))} />
+            ) },
             { key: 'dates', label: 'Dates', render: (a) => `${formatDate(a.start_date)} – ${formatDate(a.end_date)}` },
             { key: 'cost', label: 'Weekly cost', align: 'right', hidden: !showCost,
               render: (a) => (a.weekly_cost === undefined ? '—' : formatMoney(a.weekly_cost)) },

@@ -11,7 +11,8 @@ import * as projectService from '../services/projectService'
 import { ARCHIVE_NOTE, messageFor } from '../pages/apiMessages'
 import { DELIVERABLE_STATUS, formatDate } from '../pages/format'
 import ConfirmDialog from './ConfirmDialog'
-import { DeliverableEditDialog, DeliverableFormDialog, DependenciesDialog } from './DeliverableDialogs'
+import { DeliverableEditDialog, DeliverableFormDialog, DependenciesDialog, MAX_NAME } from './DeliverableDialogs'
+import InlineEditCell from './inline/InlineEditCell'
 import { LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
@@ -70,6 +71,35 @@ export default function DeliverablesSection({ project, canEdit }) {
     result.reload()
   }
 
+  /** Save one field changed in place. On a refusal the cell rolls back and this says why. */
+  async function saveInline(deliverable, changes) {
+    setNotice(null)
+    try {
+      const updated = await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, changes))
+      setNotice({ severity: 'success', text: `${updated.name} was updated.` })
+      result.reload()
+    } catch (error) {
+      const details = detailsSentence(error, { deliverables: rows })
+      setNotice({
+        severity: 'error',
+        text: `${deliverable.name}: ${messageFor(error)}${details ? ` ${details}.` : ''} The change was undone.`,
+      })
+      throw error
+    }
+  }
+
+  const checkName = (name) => {
+    if (!name) return 'Enter a name.'
+    return name.length > MAX_NAME ? `Use at most ${MAX_NAME} characters.` : null
+  }
+  const checkDue = (d) => (due) => {
+    if (!due) return 'Choose a due date.'
+    if (due < project.start_date || due > project.end_date) {
+      return `Pick a date from ${formatDate(project.start_date)} to ${formatDate(project.end_date)}.`
+    }
+    return due < d.start_date ? 'Due on or after the start date.' : null
+  }
+
   async function handleStatus(deliverable, status) {
     setNotice(null)
     setSaving(deliverable.id)
@@ -108,12 +138,18 @@ export default function DeliverablesSection({ project, canEdit }) {
           <ResponsiveTable label="Deliverables" rows={rows} empty="No deliverables yet." columns={[
             { key: 'name', label: 'Deliverable', primary: true, render: (d) => (
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                {d.name}
+                <InlineEditCell canEdit={canEdit} value={d.name} what={`name of ${d.name}`}
+                  validate={checkName} onSave={(name) => saveInline(d, { name })} />
                 {d.overdue && <Chip size="small" color="error" label="Overdue" />}
                 {d.blocked && <Chip size="small" color="warning" label="Blocked" />}
               </Box>
             ) },
-            { key: 'dates', label: 'Dates', render: (d) => `${formatDate(d.start_date)} – ${formatDate(d.due_date)}` },
+            { key: 'dates', label: 'Dates', render: (d) => (
+              <InlineEditCell canEdit={canEdit} value={d.due_date} type="date" what={`due date of ${d.name}`}
+                format={(due) => `${formatDate(d.start_date)} – ${formatDate(due)}`}
+                inputProps={{ min: d.start_date, max: project.end_date }}
+                validate={checkDue(d)} onSave={(due_date) => saveInline(d, { due_date })} />
+            ) },
             { key: 'status', label: 'Status', render: (d) => (canEdit ? (
               <TextField select size="small" value={d.status} disabled={saving === d.id}
                 onChange={(e) => handleStatus(d, e.target.value)}
