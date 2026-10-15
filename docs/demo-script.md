@@ -28,7 +28,13 @@ Sign in as `admin@acme-demo.test`.
    seconds or when I leave the page. The server still sends it to an admin only."
 6. Click **Reports**, then the **Resources** tab: the heat-map. Ana's 36 h weeks are amber ("near
    capacity").
-7. Optional: click the chevron at the sidebar edge (**Collapse sidebar**) to show the icon rail, then
+7. **Activity (30 seconds).** Click **Activity** in the sidebar. Read a few rows near the top: "Alex Admin
+   signed in", "Ken Ito changed the assignment of Gus Petrov on project 'Data lake' (hours per week)", "Marta
+   Lopez archived deliverable 'Legacy CSV export'". Click the **People** chip: "Alex Admin changed a
+   salary for Bo Chen". Say: "Every change is logged. A salary change says that it happened, never the
+   number, and the server builds these sentences from a whitelist, so no amount can slip in." Hover a
+   time to see the exact date.
+8. Optional: click the chevron at the sidebar edge (**Collapse sidebar**) to show the icon rail, then
    expand it again.
 
 Sign out.
@@ -51,6 +57,9 @@ Sign in as `marta@acme-demo.test`.
 4. **Archive, never delete.** Click **Projects**, then **Archive** on the **Mobile app** row. The dialog
    says "Its deliverables and assignments are archived too. Nothing is deleted." Click **Archive**: the
    project leaves the list. (Signed in as Alex, **Show archived** brings it back with an "Archived" chip.)
+5. **Activity, scoped.** Click **Activity**. Marta sees only her team's projects: the chips are just
+   **All, Projects, Deliverables, Assignments**, and the newest row is her own "Marta Lopez archived
+   project 'Mobile app'". No sign-ins, no people, no salaries, and nothing about Ken's Data lake.
 
 Sign out.
 

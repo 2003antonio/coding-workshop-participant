@@ -17,7 +17,9 @@ The demo runs locally on my laptop (see [How to run locally](#how-to-run-locally
 Plainly, before you look further:
 - **The cloud deploy was attempted and stopped at database creation**, because the AWS account hit its RDS
   quota (40 of 40 database clusters already in use in `us-east-2`). So the demo runs locally.
-- **The audit log is written to the database but has no screen yet.**
+- **Every change is written to an audit log, and the Activity screen shows it** (admin: everything;
+  a manager: only their teams' projects, deliverables and assignments; employees: no access). The server
+  builds each sentence from a whitelist, so no salary, rate or cost figure is ever in it, for anyone.
 - **The salary reveal is a display guard only.** An admin sees salaries and hourly rates masked until they
   click the eye button, and they mask again after 30 seconds or when the admin leaves the page. This stops
   someone reading them over the admin's shoulder. The API still sends these figures to an admin (and never
@@ -32,16 +34,18 @@ Taken with the seeded demo data on October 14, 2026 (`docs/screenshots/final/`).
 |---|---|
 | ![Admin Home: portfolio health bar, five clickable cards, at-risk projects, budget bars](docs/screenshots/final/02-admin-home.png) | ![A project page: the health strip with budget, schedule and people tiles](docs/screenshots/final/06-project-health-strip.png) |
 | Admin Home. Portfolio health counts each project once; every card is a link to the detail. | Project page. The health strip: budget (committed against planned, spent so far), schedule by status, and who is on it this week. It updates as soon as an assignment or deliverable changes. |
+| ![Activity feed for the admin](docs/screenshots/final/20-activity-admin.png) | ![Activity feed for a manager, limited to their teams' projects](docs/screenshots/final/21-activity-manager.png) |
+| Activity (admin): who did what and when, in plain sentences, with filters and "Load more". Repeats fold into one row (×6). | Activity (manager): only their teams' projects, deliverables and assignments. No people, sign-in or salary rows. |
+| ![Sign-in page with the navy brand panel and mini-timeline](docs/screenshots/final/01-login.png) | ![Employees with salaries masked and leads shown as "Leads Platform"](docs/screenshots/final/13-employees-masked-salary.png) |
+| Sign-in: the brand panel with a small decorative timeline ([dark](docs/screenshots/final/18-login-dark.png), [phone](docs/screenshots/final/19-login-phone.png)). | Employees (admin): salaries masked until asked for; a team lead shows "Leads Platform", not "No team". |
 | ![Deliverables tab with status stripes and due chips](docs/screenshots/final/07-deliverables-tab.png) | ![People tab with avatars and hours against the 40 h limit](docs/screenshots/final/08-people-tab.png) |
 | Deliverables: a status stripe per row and "Due in 28 days" / "3 days overdue" chips. | People: hours per week against the 40 h limit; per-person costs stay masked until the eye is clicked. |
-| ![Projects as cards](docs/screenshots/final/05-projects-cards.png) | ![Teams as cards with lead and member avatars](docs/screenshots/final/09-teams.png) |
-| Projects as cards (the table is the default; the choice is remembered). | Teams with their lead and members. |
-| ![Reports, Project status with a status bar per project](docs/screenshots/final/10-reports-status.png) | ![Employee Home: one-line summary with a sparkline, and four cards](docs/screenshots/final/04-employee-home.png) |
-| Reports, Project status: done, in progress and not started per project. | Employee Home: the coming weeks in one line and a sparkline, then cards that lead to My work and the projects. |
+| ![Projects as cards](docs/screenshots/final/05-projects-cards.png) | ![Employee Home: one-line summary with a sparkline, and four cards](docs/screenshots/final/04-employee-home.png) |
+| Projects as cards (the table is the default; the choice is remembered). | Employee Home: the coming weeks in one line and a sparkline, then cards that lead to My work and the projects. |
 
-More: [sign-in](docs/screenshots/final/01-login.png), [manager Home](docs/screenshots/final/03-manager-home.png),
-[hours heat-map](docs/screenshots/final/11-reports-heatmap.png), [dependencies timeline](docs/screenshots/final/12-dependencies-timeline.png),
-[employees with salaries masked](docs/screenshots/final/13-employees-masked-salary.png), [phone](docs/screenshots/final/14-phone-project.png),
+More: [manager Home](docs/screenshots/final/03-manager-home.png), [Teams](docs/screenshots/final/09-teams.png),
+[Reports, project status](docs/screenshots/final/10-reports-status.png), [hours heat-map](docs/screenshots/final/11-reports-heatmap.png),
+[dependencies timeline](docs/screenshots/final/12-dependencies-timeline.png), [phone](docs/screenshots/final/14-phone-project.png),
 [dark mode](docs/screenshots/final/15-dark-project.png), [empty state for someone with no work](docs/screenshots/final/16-empty-state-hal.png),
 [a manager's hidden small-group budget](docs/screenshots/final/17-manager-budget-hidden.png).
 `npm run e2e` also saves every page for every demo account under `docs/screenshots/<account>/` (not committed).
@@ -209,10 +213,10 @@ Last full run on this laptop, October 14, 2026 (all from that run):
 
 | Check | Result |
 |---|---|
-| Backend, `pytest` | 739 passed, 99.01% coverage |
-| Frontend, `npm run coverage` (Vitest) | 459 passed in 37 files; 95.97% statements, 90.72% branches, 96.2% functions, 97.09% lines |
+| Backend, `pytest` | 749 passed, 99.03% coverage |
+| Frontend, `npm run coverage` (Vitest) | 468 passed in 38 files; 95.95% statements, 90.73% branches, 96.13% functions, 97.02% lines |
 | `npm run lint` | No problems |
-| `npm run build` | Built; main bundle 423.75 kB (137.82 kB gzipped) |
+| `npm run build` | Built; main bundle 423.94 kB (137.88 kB gzipped) |
 | End-to-end, Playwright (`e2e/01-pages`, `e2e/02-flows`) | 11 passed |
 | Role smoke, `scripts/smoke_roles.py` | 11 passed, 0 failed |
 
@@ -237,7 +241,7 @@ Both coverage runs fail the build under 80%.
 
 As of October 14, 2026:
 
-- The audit log is written to the database, but no screen shows it yet.
+- The Activity screen lists the audit log as plain sentences; it does not show before/after values.
 - The salary reveal is a display guard only: the API still sends salaries and hourly rates to an admin.
 - Lists are not paginated. The app is sized for demo data.
 - The cloud deploy is unverified (see above). `package-lock.json` is git-ignored, so installs are not pinned.

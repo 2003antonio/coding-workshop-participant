@@ -431,9 +431,11 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
 | Report: over-allocated people (near capacity, default 32 h) | `GET /api/reports/over-allocated` | Reports → Near capacity |
 | Report: dependency chain | `GET /api/reports/dependency-chain` | Project detail → Dependencies tab (timeline); Reports → Dependencies (table) |
 | Report: budget vs planned budget | `GET /api/reports/budget` | Reports → Budget (with the shared budget bar); admin/manager Home → Budget used |
+| Who did what, when (audit log), admin and manager only | `GET /api/reports/activity` | Activity page (`/activity`, sidebar link for admin and manager): feed with type chips and "Load more" |
 
 The Home cards link to `/projects?status=active` and `/reports?tab=at-risk|deliverables|budget|near-capacity`;
-unknown values open the defaults. No new endpoints were added for these screens.
+unknown values open the defaults. No new endpoints were added for these screens; the Activity page
+is the one screen with its own endpoint (report 8).
 
 ## 11. Known gaps (allowed by design for now)
 
@@ -448,7 +450,10 @@ These are deliberate, tested behaviours that a later block may change:
   is not counted in `member_count` or the team budget, and gets no new allocations.
 - Report 3 with a `team_id` outside the caller's scope returns an empty list rather than `403`.
 - `include_archived` on teams is admin-only (§1).
-- The audit log is written by every change but has no endpoint or screen yet.
+- The Activity feed (report 8) says *what* changed (action, record and field names), never the
+  before/after values, and lists only whitelisted actions; demo resets keep old audit rows but rows
+  whose actor no longer exists are not listed. Managers never see team, people or sign-in rows,
+  even about their own team.
 - The admin salary mask is a display guard only: `GET /api/employees`, allocation and budget
   responses still carry salary, `hourly_rate` and per-person costs for an admin (and never for
   anyone else).
