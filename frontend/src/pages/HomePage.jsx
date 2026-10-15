@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import Dashboard from '../components/dashboard/Dashboard'
 import EmployeeHome from '../components/home/EmployeeHome'
+import { greeting } from '../components/home/homeMath'
 import PageHeader from '../components/PageHeader'
 import { ROLE_LABELS } from './format'
 
@@ -15,15 +16,17 @@ import { ROLE_LABELS } from './format'
  */
 export default function HomePage() {
   const { user, role } = useAuth()
+  const employee = !canSeeDashboard(role)
 
   return (
     <AppShell>
-      <PageHeader title={`Welcome, ${user?.name ?? ''}`} after={(
+      <PageHeader title={`Welcome, ${user?.name ?? ''}`}
+        subtitle={employee ? `${greeting()}. Here is your week.` : undefined} after={(
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, color: 'text.secondary' }}>
           Signed in as <Chip label={ROLE_LABELS[role] ?? role} color="primary" size="small" />
         </Box>
       )} />
-      {canSeeDashboard(role) ? <Dashboard role={role} /> : <EmployeeHome userId={user?.id} />}
+      {employee ? <EmployeeHome userId={user?.id} /> : <Dashboard role={role} />}
     </AppShell>
   )
 }

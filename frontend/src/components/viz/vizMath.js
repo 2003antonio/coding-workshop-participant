@@ -90,6 +90,6 @@ export function sparklineSentence(values, { what, unit = '' }) {
 
 /** Screen-reader-only text: read out, but it takes no space and never widens the page. */
 export const visuallyHidden = {
-  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden',
+  position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden',
   clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
 }

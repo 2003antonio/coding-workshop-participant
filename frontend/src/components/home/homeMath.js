@@ -81,3 +81,10 @@ export function myProjects(allocations) {
   }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
+
+/** "Good morning" / "Good afternoon" / "Good evening", from the hour on this computer. */
+export function greeting(now = new Date()) {
+  const hour = now.getHours()
+  if (hour < 12) return 'Good morning'
+  return hour < 18 ? 'Good afternoon' : 'Good evening'
+}

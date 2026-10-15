@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { barScale, budgetState, overBudgetCount, portfolioHealth } from '../components/dashboard/dashboardMath'
-import { localToday, nextDeadline, overdueOrSoon, workloadSummary } from '../components/home/homeMath'
+import { greeting, localToday, nextDeadline, overdueOrSoon, workloadSummary } from '../components/home/homeMath'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { renderApp } from '../test/renderApp'
 
@@ -236,48 +236,73 @@ describe('Home: employee', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('says the coming weeks in one line and shows cards that lead somewhere, not the My work chart', async () => {
+  it('greets by time of day and shows four tiles that lead to My work or a project', async () => {
     const server = signedInAs('employee')
     renderApp('/')
     expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Eve Employee' })).toBeInTheDocument()
-    // Eve: 20 h on Billing v2, plus 16 h on Data Lake in the week of Nov 16.
-    expect(await screen.findByText('20 h per week through the week of Nov 9 ’26, then 36 h.')).toBeInTheDocument()
-    expect(within(region('This week')).getByText('20 of 40 h')).toBeInTheDocument()
-    expect(within(region('This week')).getByRole('link', { name: 'This week' })).toHaveAttribute('href', '/my-work')
+    expect(screen.getByText('Good morning. Here is your week.')).toBeInTheDocument()
+    const week = await screen.findByRole('region', { name: 'This week' })
+    expect(within(week).getByRole('img', { name: '20 of 40 hours booked this week' })).toBeInTheDocument()
+    expect(within(week).getByText('20 of 40 h')).toBeInTheDocument()
+    expect(within(week).getByRole('link', { name: 'This week' })).toHaveAttribute('href', '/my-work')
+    expect(within(region('Projects')).getByText('2')).toBeInTheDocument()
     const deadline = region('Next deadline')
     expect(within(deadline).getByText('Backend')).toBeInTheDocument()
-    expect(within(deadline).getByText('Billing v2 · Due Dec 4, 2026')).toBeInTheDocument()
+    expect(within(deadline).getByText('Due in 24 days')).toBeInTheDocument()
     expect(within(deadline).getByRole('link', { name: 'Next deadline' })).toHaveAttribute('href', '/projects/p-1')
-    const urgent = region('Overdue or due soon')
-    expect(within(urgent).getByRole('link', { name: 'Frontend' })).toHaveAttribute('href', '/projects/p-1')
-    expect(within(urgent).getByText('Billing v2 · Overdue since Nov 9, 2026')).toBeInTheDocument()
-    const mine = region('My projects')
-    expect(within(mine).getByRole('link', { name: 'View Billing v2' })).toHaveAttribute('href', '/projects/p-1')
-    expect(within(mine).getByRole('link', { name: 'View Data Lake' })).toHaveAttribute('href', '/projects/p-2')
+    expect(within(region('Overdue')).getByText('1')).toBeInTheDocument()
+    expect(within(region('Overdue')).getByText('deliverable needs attention')).toBeInTheDocument()
     // Not the My work page again, and no manager reports.
-    expect(screen.queryByRole('region', { name: 'Hours per week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Assignments' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'At a glance' })).not.toBeInTheDocument()
     expect(server.count('GET', '/api/reports/at-risk-projects')).toBe(0)
     expect(server.count('GET', '/api/reports/budget')).toBe(0)
   })
 
-  it('hides "Overdue or due soon" when nothing is', async () => {
+  it('shows my projects as cards, what is coming up, who I work with and the next 12 weeks; no pay data', async () => {
+    signedInAs('employee')
+    renderApp('/')
+    const mine = await screen.findByRole('list', { name: 'My projects' })
+    const billing = within(mine).getByRole('link', { name: 'Billing v2' }).closest('li')
+    expect(within(billing).getByRole('link', { name: 'Billing v2' })).toHaveAttribute('href', '/projects/p-1')
+    expect(within(billing).getByText('Platform')).toBeInTheDocument()
+    expect(within(billing).getByText('1 of 3 done, 1 overdue.')).toBeInTheDocument()
+    expect(within(mine).getByRole('link', { name: 'Data Lake' })).toHaveAttribute('href', '/projects/p-2')
+
+    const coming = region('Coming up')
+    expect(within(coming).getByRole('link', { name: 'Frontend' })).toHaveAttribute('href', '/projects/p-1')
+    expect(within(coming).getByText('1 day overdue')).toBeInTheDocument()
+
+    const people = region('Who you work with')
+    const stack = within(people).getByRole('img')
+    expect(stack).toHaveAccessibleName(/people: /)
+    expect(stack).not.toHaveAccessibleName(/Eve Employee/)
+
+    const strip = region('Next 12 weeks')
+    expect(within(strip).getByRole('list', { name: 'Your hours per week, next 12 weeks' })).toHaveTextContent('Nov 9 ’26: 20 h')
+    expect(within(strip).getByRole('link', { name: 'See full breakdown' })).toHaveAttribute('href', '/my-work')
+    expect(document.body.textContent).not.toMatch(/\$|salary|hourly rate/i)
+  })
+
+  it('says when nothing is coming up', async () => {
     signedInAs('employee', {
       routes: { 'GET /api/reports/deliverable-status': () => reply(200, { deliverables: [] }) },
     })
     renderApp('/')
-    expect(await screen.findByRole('region', { name: 'My projects' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Overdue or due soon' })).not.toBeInTheDocument()
+    expect(await within(await screen.findByRole('region', { name: 'Coming up' })).findByText('Nothing due soon.')).toBeInTheDocument()
     expect(within(region('Next deadline')).getByText('Nothing due on your projects.')).toBeInTheDocument()
+    expect(within(region('Overdue')).getByText('Nothing overdue')).toBeInTheDocument()
   })
 
-  it('someone with no assignments gets an empty state with a next step', async () => {
+  it('someone with no assignments still gets the greeting and zero tiles, then an empty state', async () => {
     signedInAs('u-8') // Nia New: no team, no allocations
     renderApp('/')
     expect(await screen.findByText('You are not assigned to any project yet')).toBeInTheDocument()
+    expect(screen.getByText('Good morning. Here is your week.')).toBeInTheDocument()
+    expect(within(region('This week')).getByText('0 of 40 h')).toBeInTheDocument()
+    expect(within(region('Projects')).getByText('0')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open My work' })).toHaveAttribute('href', '/my-work')
-    expect(screen.queryByRole('region', { name: 'This week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Coming up' })).not.toBeInTheDocument()
   })
 })
 
@@ -365,16 +390,9 @@ describe('Home: portfolio health and the employee sparkline', () => {
     )).toEqual({ healthy: 2, at_risk: 1, over_budget: 1, hidden: 1 })
   })
 
-  it('an employee sees a sparkline of their coming weeks beside the summary', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date(2026, 10, 10, 9, 0))
-    try {
-      signedInAs('employee')
-      renderApp('/')
-      expect(await screen.findByRole('img', { name: /^Your hours per week, next 8 weeks: from 20 h to / }))
-        .toBeInTheDocument()
-    } finally {
-      vi.useRealTimers()
-    }
+  it('greeting follows the hour on this computer', () => {
+    expect(greeting(new Date(2026, 10, 10, 7))).toBe('Good morning')
+    expect(greeting(new Date(2026, 10, 10, 13))).toBe('Good afternoon')
+    expect(greeting(new Date(2026, 10, 10, 20))).toBe('Good evening')
   })
 })
