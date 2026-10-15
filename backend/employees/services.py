@@ -140,3 +140,16 @@ def archive_employee(actor: dict, employee_id: str) -> dict:
         archived = repository.archive_employee(employee_id)
         audit.record("employee_archived", actor["id"], "employee", employee_id)
     return _view(archived, "admin")
+
+
+def unarchive_employee(actor: dict, employee_id: str) -> dict:
+    """Bring back an archived employee: the record only. Their old team membership and
+    allocations are left exactly as they are. Not archived (or unknown) -> 404."""
+    with db.transaction():
+        _require_still_admin(actor)
+        row = repository.find_employee_for_update(employee_id)
+        if row is None or row["archived_at"] is None:
+            raise NotFound(*_NOT_FOUND)
+        restored = repository.unarchive_employee(employee_id)
+        audit.record("employee_unarchived", actor["id"], "employee", employee_id)
+    return _view(restored, "admin")

@@ -166,3 +166,14 @@ def test_rows_whose_actor_no_longer_exists_are_left_out(api, world, log):
     log("project_created", {"id": "00000000-0000-0000-0000-0000000000aa"}, "project", world["billing"])
     log("project_archived", world["max"], "project", world["billing"], minute=1)
     assert sentences(get(api, world["admin"])) == ["Max Manager archived project 'Billing'"]
+
+
+def test_unarchived_rows_are_whitelisted_sentences_with_manager_scope(api, world, log):
+    log("employee_unarchived", world["admin"], "employee", world["e1"], {"salary": SALARY})
+    log("project_unarchived", world["max"], "project", world["billing"], {"note": "x"}, minute=1)
+    admin = get(api, world["admin"])
+    assert sentences(admin) == ["Max Manager unarchived project 'Billing'", "Ada Admin unarchived Eve One"]
+    assert str(SALARY) not in admin.text and all("details" not in r for r in admin.json["activity"])
+    # A manager sees the project row of their team, never the people row.
+    assert sentences(get(api, world["max"])) == ["Max Manager unarchived project 'Billing'"]
+    assert sentences(get(api, world["mia"])) == []

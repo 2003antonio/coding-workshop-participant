@@ -34,6 +34,19 @@ possible later changes that are **not** built.
     manager without the flag; for anyone else it is `404`.
 
   Archiving twice → `409 already_archived`. Archived rows cannot be changed → `409 archived`.
+- **Unarchive (people and projects only).** `POST /api/employees/{id}/unarchive` (admin) and
+  `POST /api/projects/{id}/unarchive` (admin; the manager of the project's team) clear
+  `archived_at` and return the restored record in its usual shape (the same fields the caller
+  would see from `GET`; salary only for an admin). Unarchiving something that is not archived
+  (or does not exist, or the caller cannot see) → `404 not_found`. A manager on the employee
+  route, or an employee on either → `403`. Audited as `employee_unarchived` / `project_unarchived`
+  (no details).
+  - An employee comes back as a record only: the team membership and allocations they had are
+    left exactly as they are (archived allocations stay archived).
+  - A project whose team is archived → `409 team_archived` (teams have no unarchive, so such a
+    project stays archived). The deliverables archived together with the project
+    (same `archived_at`) come back with it; deliverables archived earlier and all allocations stay
+    archived (people may have moved on, and the 40-hour rule is not re-checked).
 - **Text fields:** trimmed, non-empty, max 200 chars (`name`), description max 2000, may be empty.
 - **Weeks.** A "calendar week" is an ISO week, Monday to Sunday, identified by its Monday
   (`week_start`). An allocation counts its full `hours_per_week` in every week its date range
@@ -123,6 +136,7 @@ have a non-archived allocation (past, current or future).
 | `POST /` | admin; manager for a team they lead | `{"team_id", "name", "description?", "status?", "start_date", "end_date", "planned_budget?"}` | `201 project` |
 | `PUT /{id}` | admin; the project's manager | any of `name, description, status, start_date, end_date, planned_budget`; `team_id` admin only | `200 project` |
 | `POST /{id}/archive` | admin; the project's manager | — | `200 project` |
+| `POST /{id}/unarchive` | admin; the project's manager | — | `200 project` (see §1, Unarchive) |
 | `GET /{id}/budget` | admin; the project's manager | — | `200 budget` (see §7) |
 
 List order: `start_date`, then name. Filters:
@@ -386,7 +400,8 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
      change reads "Alex Admin changed a salary for Ana Silva". Token refreshes are not listed.
    - Actions listed: `employee_created|role_changed|salary_changed|updated|archived` (people),
      `team_created|lead_changed|updated|member_added|member_removed|archived` (teams),
-     `project_created|updated|archived` (projects),
+     `employee_unarchived` (people: "Alex Admin unarchived Ana Silva"),
+     `project_created|updated|archived|unarchived` (projects),
      `deliverable_created|updated|dependencies_changed|archived` (deliverables),
      `allocation_created|updated|archived` (assignments),
      `login_success|failure|locked`, `logout`, `refresh_reuse_detected` (sign-ins).
@@ -398,7 +413,7 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
 |---|---|---|
 | `invalid_lead`, `invalid_team`, `invalid_employee`, `invalid_dependency`, `invalid_dates`, `invalid_range` | 400 | input that refers to the wrong thing |
 | `name_taken`, `on_other_team`, `already_member`, `has_active_projects`, `leads_team`, `lead_cannot_be_member` | 409 | teams / employees |
-| `dates_conflict`, `deliverables_open`, `project_closed` | 409 | projects |
+| `dates_conflict`, `deliverables_open`, `project_closed`, `team_archived` | 409 | projects (`team_archived`: unarchive) |
 | `dependency_cycle`, `dependencies_not_done`, `dependents_started`, `has_dependents` | 409 | deliverables |
 | `over_allocated`, `overlapping_allocation` | 409 | allocations |
 | `archived`, `already_archived` | 409 | everywhere (existing codes) |
@@ -416,6 +431,8 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
 | Search projects by name or description | `GET /api/projects?q=` | Projects page → search box |
 | Planned budget per project (admin and manager) | `POST/PUT /api/projects` (`planned_budget`) | Project form → budget field |
 | Archive a project | `POST /api/projects/{id}/archive` | Project detail |
+| Unarchive a project (admin; the team's manager) | `POST /api/projects/{id}/unarchive` | Projects page → "Show archived" → Unarchive (toast "Project unarchived") |
+| Unarchive an employee (admin) | `POST /api/employees/{id}/unarchive` | Employees page → "Show archived" → Unarchive (toast "Employee unarchived") |
 | Deliverables with dates | `GET/POST/PUT /api/projects/{id}/deliverables` | Project detail → Deliverables tab |
 | Dependencies, no cycles | `PUT .../deliverables/{id}/dependencies` | Deliverable form → "depends on" picker |
 | Cannot start before dependencies are done | `PUT .../deliverables/{id}` (status) | Deliverables tab → status control |
@@ -435,7 +452,10 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
 
 The Home cards link to `/projects?status=active` and `/reports?tab=at-risk|deliverables|budget|near-capacity`;
 unknown values open the defaults. No new endpoints were added for these screens; the Activity page
-is the one screen with its own endpoint (report 8).
+is the one screen with its own endpoint (report 8). Closing a project ("Close project" / "Reopen
+project" on Project detail) is `PUT /api/projects/{id}` with `status: completed` / `active`; the
+employee Home and the admin/manager "Coming up" card use only `GET /api/allocations`,
+`GET /api/projects`, `GET /api/teams` and report 4.
 
 ## 11. Known gaps (allowed by design for now)
 
@@ -448,6 +468,9 @@ These are deliberate, tested behaviours that a later block may change:
 - Archiving an employee leaves their team membership and allocations as they are; those
   allocations still count in project costs until an admin archives them. An archived person
   is not counted in `member_count` or the team budget, and gets no new allocations.
+- Unarchiving an employee does not restore allocations, and unarchiving a project does not
+  restore its allocations; they must be made again (and pass the 40-hour rule). Teams and
+  deliverables have no unarchive of their own.
 - Report 3 with a `team_id` outside the caller's scope returns an empty list rather than `403`.
 - `include_archived` on teams is admin-only (§1).
 - The Activity feed (report 8) says *what* changed (action, record and field names), never the

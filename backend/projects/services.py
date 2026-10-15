@@ -174,6 +174,24 @@ def archive_project(actor: dict, project_id: str) -> dict:
     return get_project(actor, project_id)
 
 
+def unarchive_project(actor: dict, project_id: str) -> dict:
+    """Bring back an archived project (admin; the manager of its team), with the deliverables
+    archived together with it. Not archived, unknown or hidden -> 404; team archived -> 409."""
+    with db.transaction():
+        row = _visible_project(actor, project_id)
+        if not _can_manage(actor, row):
+            raise Forbidden()
+        row = repository.lock_project(project_id)
+        if row["archived_at"] is None:
+            raise NotFound(*_PROJECT_NOT_FOUND)
+        team = repository.lock_team(str(row["team_id"]))
+        if team is None or team["archived_at"] is not None:
+            raise Conflict("Its team is archived, so the project cannot be restored.", "team_archived")
+        repository.unarchive_project(project_id, row["archived_at"])
+        audit.record("project_unarchived", actor["id"], "project", project_id)
+    return get_project(actor, project_id)
+
+
 def project_budget(actor: dict, project_id: str) -> dict:
     """Committed and used-to-date cost from the project's allocations, the
     typed-in planned budget, and how the costs compare with it.
