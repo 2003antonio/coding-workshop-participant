@@ -9,6 +9,7 @@ import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import { DELIVERABLE_STATUS, formatDate } from '../pages/format'
 import FormDialog from './FormDialog'
+import { defaultStartDate } from './deliverableDates'
 import { DateField } from './ProjectFormDialog'
 
 export const MAX_NAME = 200
@@ -51,7 +52,9 @@ function deliverableErrors(values, project) {
   else if (outside(values.start_date)) found.start_date = range
   if (!values.due_date) found.due_date = 'Choose a due date.'
   else if (outside(values.due_date)) found.due_date = range
-  else if (values.start_date && values.due_date < values.start_date) found.due_date = 'Due on or after the start date.'
+  else if (values.start_date && values.due_date < values.start_date) {
+    found.due_date = 'The due date can’t be before the start date. Pick the start date or a later day.'
+  }
   return found
 }
 
@@ -65,11 +68,15 @@ const fieldProps = (values, setValues, errors) => (name) => ({
 })
 
 /**
- * Add a deliverable. Dates must sit inside the project's dates.
+ * Add a deliverable. Dates must sit inside the project's dates; both start on
+ * defaultStartDate() (due = start), so the due date is never before the start.
  * onSubmit({ name, description, start_date, due_date, depends_on }).
  */
 export function DeliverableFormDialog({ project, deliverables, onClose, onSubmit }) {
-  const [values, setValues] = useState({ name: '', description: '', start_date: '', due_date: '' })
+  const [values, setValues] = useState(() => {
+    const start = defaultStartDate(project)
+    return { name: '', description: '', start_date: start, due_date: start }
+  })
   const [dependsOn, setDependsOn] = useState([])
   const [errors, setErrors] = useState({})
   const field = fieldProps(values, setValues, errors)

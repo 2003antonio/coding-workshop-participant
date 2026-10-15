@@ -97,7 +97,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     if (due < project.start_date || due > project.end_date) {
       return `Pick a date from ${formatDate(project.start_date)} to ${formatDate(project.end_date)}.`
     }
-    return due < d.start_date ? 'Due on or after the start date.' : null
+    return due < d.start_date ? 'The due date can’t be before the start date. Pick the start date or a later day.' : null
   }
 
   async function handleStatus(deliverable, status) {

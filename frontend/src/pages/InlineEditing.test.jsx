@@ -92,7 +92,7 @@ describe('In-place editing: deliverables', () => {
     const due = screen.getByLabelText('Change due date of Backend')
     await user.clear(due)
     await user.type(due, '2026-11-05{Enter}')
-    expect(screen.getByText('Due on or after the start date.')).toBeInTheDocument()
+    expect(screen.getByText('The due date can’t be before the start date. Pick the start date or a later day.')).toBeInTheDocument()
     await user.clear(due)
     await user.type(due, '2027-06-01{Enter}')
     expect(screen.getByText('Pick a date from Nov 2, 2026 to Mar 31, 2027.')).toBeInTheDocument()
