@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import ChevronLeft from '@mui/icons-material/ChevronLeft'
-import DarkModeOutlined from '@mui/icons-material/DarkModeOutlined'
-import LightModeOutlined from '@mui/icons-material/LightModeOutlined'
 import Logout from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import AppBar from '@mui/material/AppBar'
@@ -18,7 +16,6 @@ import ListItemText from '@mui/material/ListItemText'
 import Toolbar from '@mui/material/Toolbar'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import { useColorScheme } from '@mui/material/styles'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { useBreakpoint } from '../hooks/useBreakpoint'
@@ -26,6 +23,7 @@ import { navItemsFor, sectionTitle } from '../navigation'
 import { ROLE_LABELS } from '../pages/format'
 import PageContainer from './PageContainer'
 import PageTransition from './motion/PageTransition'
+import ThemeToggle from './ThemeToggle'
 
 const SIDEBAR_WIDTH = 240
 /** The collapsed sidebar: icons only. */
@@ -115,19 +113,6 @@ function Sidebar({ role, onNavigate, collapsed = false }) {
         </List>
       </Box>
     </Box>
-  )
-}
-
-/** Light/dark switch. Starts from the computer's setting; MUI remembers a choice. */
-function ThemeToggle() {
-  const { mode, systemMode, setMode } = useColorScheme()
-  const isDark = (mode === 'system' ? systemMode : mode) === 'dark'
-  const label = isDark ? 'Switch to light theme' : 'Switch to dark theme'
-  return (
-    <IconButton aria-label={label} title={label} onClick={() => setMode(isDark ? 'light' : 'dark')}
-      sx={{ width: 44, height: 44, flexShrink: 0 }}>
-      {isDark ? <LightModeOutlined /> : <DarkModeOutlined />}
-    </IconButton>
   )
 }
 

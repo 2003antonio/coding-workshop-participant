@@ -98,3 +98,15 @@ describe('LoginPage', () => {
     expect(screen.queryByText('Internal server error.')).not.toBeInTheDocument()
   })
 })
+
+describe('LoginPage layout', () => {
+  it('has the brand panel with a decorative timeline, a theme toggle, and no demo credentials', async () => {
+    fakeAuthServer({})
+    renderAt('/login')
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByText("See every project's week at a glance.")).toBeInTheDocument()
+    expect(screen.getByTestId('mini-timeline')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('button', { name: /Switch to (dark|light) theme/ })).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/@acme-demo\.test|password:/i)
+  })
+})
