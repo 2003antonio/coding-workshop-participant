@@ -28,22 +28,26 @@ Plainly, before you look further:
 
 ## Screenshots
 
-Taken with the seeded demo data on October 14, 2026 (`docs/screenshots/final/`).
+Taken with the seeded demo data on October 15, 2026 (`docs/screenshots/final/`).
 
 | | |
 |---|---|
-| ![Admin Home: portfolio health bar, five clickable cards, at-risk projects, budget bars](docs/screenshots/final/02-admin-home.png) | ![A project page: the health strip with budget, schedule and people tiles](docs/screenshots/final/06-project-health-strip.png) |
-| Admin Home. Portfolio health counts each project once; every card is a link to the detail. | Project page. The health strip: budget (committed against planned, spent so far), schedule by status, and who is on it this week. It updates as soon as an assignment or deliverable changes. |
+| ![Admin Home: portfolio health bar, five clickable cards, Coming up, at-risk projects, budget bars](docs/screenshots/final/24-admin-home-coming-up.png) | ![A project page: the health strip with budget, schedule and people tiles](docs/screenshots/final/06-project-health-strip.png) |
+| Admin Home. Portfolio health counts each project once; every card is a link to the detail (cards lift a little on hover). "Coming up" lists what is overdue or due in the next 14 days. | Project page. The health strip: budget (committed against planned, spent so far), schedule by status, and who is on it this week. It updates as soon as an assignment or deliverable changes. |
 | ![Activity feed for the admin](docs/screenshots/final/20-activity-admin.png) | ![Activity feed for a manager, limited to their teams' projects](docs/screenshots/final/21-activity-manager.png) |
 | Activity (admin): who did what and when, in plain sentences, with filters and "Load more". Repeats fold into one row (×6). | Activity (manager): only their teams' projects, deliverables and assignments. No people, sign-in or salary rows. |
 | ![Sign-in page with the navy brand panel and mini-timeline](docs/screenshots/final/01-login.png) | ![Employees with salaries masked and leads shown as "Leads Platform"](docs/screenshots/final/13-employees-masked-salary.png) |
 | Sign-in: the brand panel with a small decorative timeline ([dark](docs/screenshots/final/18-login-dark.png), [phone](docs/screenshots/final/19-login-phone.png)). | Employees (admin): salaries masked until asked for; a team lead shows "Leads Platform", not "No team". |
 | ![Deliverables tab with status stripes and due chips](docs/screenshots/final/07-deliverables-tab.png) | ![People tab with avatars and hours against the 40 h limit](docs/screenshots/final/08-people-tab.png) |
 | Deliverables: a status stripe per row and "Due in 28 days" / "3 days overdue" chips. | People: hours per week against the 40 h limit; per-person costs stay masked until the eye is clicked. |
-| ![Projects as cards](docs/screenshots/final/05-projects-cards.png) | ![Employee Home: one-line summary with a sparkline, and four cards](docs/screenshots/final/04-employee-home.png) |
-| Projects as cards (the table is the default; the choice is remembered). | Employee Home: the coming weeks in one line and a sparkline, then cards that lead to My work and the projects. |
+| ![Projects as cards](docs/screenshots/final/05-projects-cards.png) | ![Employee Home for Bo: greeting, four tiles with a ring gauge, project cards, Coming up, people, 12-week strip](docs/screenshots/final/22-employee-home-bo.png) |
+| Projects as cards (the table is the default; the choice is remembered). | Employee Home: a greeting, four tiles (hours this week as a ring, projects, next deadline, overdue), project cards, Coming up, who you work with, and the next 12 weeks ([phone](docs/screenshots/final/31-phone-employee-home-bo.png), [dark](docs/screenshots/final/28-dark-employee-home-bo.png), [Hal with no work](docs/screenshots/final/23-employee-home-hal.png)). |
+| ![Add employee: email domain added for you, yearly salary with $, generated temporary password](docs/screenshots/final/25-add-employee-dialog.png) | ![A project with every deliverable done: Close project next to Edit, a breadcrumb and a toast](docs/screenshots/final/26-close-project-breadcrumb-toast.png) |
+| Add employee: type the part before the @, a yearly salary with "$" and separators, and a generated temporary password shown once with Copy (dotted out in this picture). | When every deliverable is done, "Close project" appears (closing sets Completed and can be undone with "Reopen project"). Breadcrumb "Projects / Mobile app"; success messages are short toasts. |
+| ![Employees with Show archived on: an archived person greyed out with Unarchive](docs/screenshots/final/27-employees-show-archived.png) | ![Dark mode: admin Home](docs/screenshots/final/29-dark-admin-home.png) |
+| "Show archived" lists archived people greyed out with "Unarchive" (admin; projects have the same for admin and the team's manager). | Dark mode ([Employees](docs/screenshots/final/30-dark-employees.png), [project](docs/screenshots/final/15-dark-project.png)). |
 
-More: [manager Home](docs/screenshots/final/03-manager-home.png), [Teams](docs/screenshots/final/09-teams.png),
+More: [admin Home, full page](docs/screenshots/final/02-admin-home.png), [Ana's Home](docs/screenshots/final/04-employee-home.png), [manager Home](docs/screenshots/final/03-manager-home.png), [Teams](docs/screenshots/final/09-teams.png),
 [Reports, project status](docs/screenshots/final/10-reports-status.png), [hours heat-map](docs/screenshots/final/11-reports-heatmap.png),
 [dependencies timeline](docs/screenshots/final/12-dependencies-timeline.png), [phone](docs/screenshots/final/14-phone-project.png),
 [dark mode](docs/screenshots/final/15-dark-project.png), [empty state for someone with no work](docs/screenshots/final/16-empty-state-hal.png),
@@ -209,14 +213,14 @@ Known blockers to check once a cluster is available:
 
 ## Tests
 
-Last full run on this laptop, October 14, 2026 (all from that run):
+Last full run on this laptop, October 15, 2026 (all from that run):
 
 | Check | Result |
 |---|---|
-| Backend, `pytest` | 749 passed, 99.03% coverage |
-| Frontend, `npm run coverage` (Vitest) | 468 passed in 38 files; 95.95% statements, 90.73% branches, 96.13% functions, 97.02% lines |
+| Backend, `pytest` | 762 passed, 99.01% coverage |
+| Frontend, `npm run coverage` (Vitest) | 491 passed in 43 files; 96.09% statements, 90.12% branches, 96.22% functions, 97.17% lines |
 | `npm run lint` | No problems |
-| `npm run build` | Built; main bundle 423.94 kB (137.88 kB gzipped) |
+| `npm run build` | Built; main bundle 438.84 kB (142.53 kB gzipped) |
 | End-to-end, Playwright (`e2e/01-pages`, `e2e/02-flows`) | 11 passed |
 | Role smoke, `scripts/smoke_roles.py` | 11 passed, 0 failed |
 
@@ -239,9 +243,11 @@ Both coverage runs fail the build under 80%.
 
 ## Known gaps
 
-As of October 14, 2026:
+As of October 15, 2026:
 
 - The Activity screen lists the audit log as plain sentences; it does not show before/after values.
+- No change-password screen: a new person keeps the temporary password the admin generated until one exists.
+- Unarchive brings back people and projects only (not teams), and never their old assignments.
 - The salary reveal is a display guard only: the API still sends salaries and hourly rates to an admin.
 - Lists are not paginated. The app is sized for demo data.
 - The cloud deploy is unverified (see above). `package-lock.json` is git-ignored, so installs are not pinned.

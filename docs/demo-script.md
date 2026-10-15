@@ -10,22 +10,31 @@ Sign in as `admin@acme-demo.test`.
 
 1. **Home.** Point at the **Portfolio health** bar: "1 of 3 projects healthy", one at risk, one over budget,
    each project counted once. Say: "Five cards under it, each one a link." Point at **At risk 2** and
-   **Over budget 1**.
+   **Over budget 1**. Under them, **Coming up** lists what is overdue or due in the next 14 days
+   (Migration guide, 4 days overdue), with **View all deliverables**.
 2. Click the **At risk** card. Reports opens on the **At risk** tab: Billing v2 (overdue deliverable,
    over budget) and Data lake (a dependency starts before its date).
-3. Click **Billing v2**. The **health strip** under the title has three tiles:
+3. Click **Billing v2**. Point at the breadcrumb **Projects / Billing v2** above the title (on a phone it
+   becomes "← Projects"). The **health strip** under the title has three tiles:
    - **Budget**: **Over budget**, "Committed $41,180 of $38,000 planned (108%)", "Spent so far: 27%".
      Say: "The light bar is what the assignments commit, the dark part is what is spent so far, the
      line is the plan."
    - **Schedule**: "1 of 5 done, 1 overdue, 2 blocked", with a bar and every count in words.
    - **People**: four avatars and "4 people, 70 h this week".
    Click the **People** tab and change Ana's hours from 30 to 20 in place: the Budget tile says
-   "Updating..." and its numbers drop at once, no reload. Put it back to 30. (Employees see Schedule
+   "Updating..." and its numbers drop at once, no reload, and a short toast says "Assignment updated:
+   Ana Silva" bottom left. Put it back to 30. (Employees see Schedule
    and People only, never a budget tile.)
 4. Click the **Dependencies** tab: the timeline, longest chain outlined, the red line is today.
 5. Click **Employees** in the sidebar. Salaries show `$ ••••••`. Click the eye **Show salary for Ana
    Silva**: `$124,800.00`. Say: "Masked by default against shoulder-surfing; it hides again after 30
    seconds or when I leave the page. The server still sends it to an admin only."
+   Click **Add employee**: type only "nia" in Email (the "@acme-demo.test" is added for you), a yearly
+   salary shows "$" and "70,000", and **Generate temporary password** makes one to share once, with
+   **Copy**. Click **Cancel** (no need to create her).
+   **Closing a project:** open **Projects → Mobile app**, set **App design** to **Done**: **Close
+   project** appears next to Edit. Click it, confirm: the status becomes Completed and a toast says
+   "Project closed". Click **Reopen project** before moving on (Marta assigns someone to it below).
 6. Click **Reports**, then the **Resources** tab: the heat-map. Ana's 36 h weeks are amber ("near
    capacity").
 7. **Activity (30 seconds).** Click **Activity** in the sidebar. Read a few rows near the top: "Alex Admin
@@ -56,10 +65,12 @@ Sign in as `marta@acme-demo.test`.
    billing API -> API spec". Click **Cancel**.
 4. **Archive, never delete.** Click **Projects**, then **Archive** on the **Mobile app** row. The dialog
    says "Its deliverables and assignments are archived too. Nothing is deleted." Click **Archive**: the
-   project leaves the list. (Signed in as Alex, **Show archived** brings it back with an "Archived" chip.)
+   project leaves the list. Turn on **Show archived**: it is back, greyed out with an "Archived" chip and
+   an **Unarchive** button (her team, so she may). Click **Unarchive**: toast "Project unarchived: Mobile
+   app". Alex has the same on **Employees** for people.
 5. **Activity, scoped.** Click **Activity**. Marta sees only her team's projects: the chips are just
-   **All, Projects, Deliverables, Assignments**, and the newest row is her own "Marta Lopez archived
-   project 'Mobile app'". No sign-ins, no people, no salaries, and nothing about Ken's Data lake.
+   **All, Projects, Deliverables, Assignments**, and the newest rows are her own "Marta Lopez unarchived
+   project 'Mobile app'" and "...archived project 'Mobile app'". No sign-ins, no people, no salaries, and nothing about Ken's Data lake.
 
 Sign out.
 
@@ -71,9 +82,9 @@ Sign in as `hal@acme-demo.test`.
    button.
 2. **Projects:** "No projects to show yet." **Teams:** "You aren't on a team yet." No errors anywhere.
 
-Optional: sign in as `ana@acme-demo.test` for the employee Home with data: "30 h per week through the
-week of Oct 19 ’26, then 36 h.", **This week 30 of 40 h**, the next deadline, an overdue deliverable and
-her two projects.
+Optional: sign in as `bo@acme-demo.test` for the employee Home with data: "Good morning. Here is your
+week.", four tiles (**This week** as a ring with "20 of 40 h", **Projects 1**, the next deadline, **Overdue
+1**), the Billing v2 card, **Coming up**, **Who you work with**, and the next 12 weeks against 40 h.
 
 ## 4. Phone view (about 30 seconds)
 
@@ -85,8 +96,8 @@ the hours chart with its legend ("32 h = near capacity", "40 h = weekly limit").
 
 - **No cloud demo.** The AWS deploy stopped at database creation because the account hit its RDS quota;
   everything you saw runs locally.
-- **No audit log screen.** Every change is written to the audit log in the database, but there is no page
-  to read it yet.
+- **No change-password screen.** A new person signs in with the temporary password the admin generated
+  and shared; there is no page yet to change it.
 - **The salary mask is a display guard.** The API still sends salaries and rates to an admin; the mask
   only stops someone reading them off the screen.
 - Lists are not paginated (sized for demo data), and `package-lock.json` is git-ignored, so installs are
