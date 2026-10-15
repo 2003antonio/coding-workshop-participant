@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -14,6 +15,7 @@ import { useAuth } from '../auth/useAuth'
 import { useBreakpoint } from '../hooks/useBreakpoint'
 import AllocationsSection from '../components/AllocationsSection'
 import AppShell from '../components/AppShell'
+import CloseProjectButton from '../components/CloseProjectButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageHeader from '../components/PageHeader'
 import DeliverablesSection from '../components/DeliverablesSection'
@@ -41,6 +43,7 @@ export default function ProjectDetailPage() {
   const [tab, setTab] = useState('deliverables')
   const [archiving, setArchiving] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [statusError, setStatusError] = useState('') // why a reopen was refused
   const toast = useToast()
   // The page's one refresh: any change on it (project, deliverable, assignment) bumps
   // refreshKey, and the project, header budget, health strip and open tab load again.
@@ -98,6 +101,7 @@ export default function ProjectDetailPage() {
                       <Button variant="outlined" onClick={() => setEditing(true)} disabled={teams.status === 'loading'}>
                         Edit project
                       </Button>
+                      <CloseProjectButton project={project} onError={setStatusError} />
                       <Button color="error" variant="outlined" onClick={() => setArchiving(true)}>Archive project</Button>
                     </>
                   )}
@@ -111,6 +115,10 @@ export default function ProjectDetailPage() {
                       <ProjectHealthStrip project={project} showBudget={canManage} ownOnly={role === 'employee'} />
                     </>
                   )} />
+
+                {statusError && (
+                  <Alert severity="error" role="alert" onClose={() => setStatusError('')} sx={{ mb: 2 }}>{statusError}</Alert>
+                )}
 
                 <Paper variant="outlined" sx={{ mb: 2 }}>
                   <Tabs value={current} onChange={(event, value) => setTab(value)} aria-label="Project sections"
