@@ -15,7 +15,7 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import ClearOutlined from '@mui/icons-material/ClearOutlined'
 import { useBreakpoint } from '../../hooks/useBreakpoint'
-import { MAX_SEARCH } from './filterMath'
+import { MAX_SEARCH, chosen } from './filterMath'
 
 /**
  * A search region named `label`. Its controls sit in one row (`columns` is the CSS
@@ -61,10 +61,13 @@ export function SearchField({ label, value, onChange, onClear }) {
   )
 }
 
-/** A dropdown whose first choice, `allLabel` (value ''), means no filter. options: [{ value, label }]. */
+/**
+ * A dropdown whose first choice, `allLabel` (value ''), means no filter. options: [{ value, label }].
+ * A value that is not (yet) an option shows as `allLabel` (filterMath.js `chosen`).
+ */
 export function SelectFilter({ label, allLabel, value, onChange, options }) {
   return (
-    <TextField select label={label} size="small" value={value} onChange={(e) => onChange(e.target.value)}>
+    <TextField select label={label} size="small" value={chosen(value, options)} onChange={(e) => onChange(e.target.value)}>
       <MenuItem value="">{allLabel}</MenuItem>
       {options.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
     </TextField>

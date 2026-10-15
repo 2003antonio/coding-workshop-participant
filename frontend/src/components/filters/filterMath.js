@@ -42,3 +42,9 @@ export function optionsFrom(rows, pick) {
 
 /** { value: label } (e.g. PROJECT_STATUS in pages/format.js) as dropdown options, in that order. */
 export const optionsOf = (labels) => Object.entries(labels).map(([value, label]) => ({ value, label }))
+
+/**
+ * `value` if it is one of `options`, else '' (no filter): a value from the address that
+ * names no option (a team you can't see, or not loaded yet) never filters or shows.
+ */
+export const chosen = (value, options) => (options.some((o) => o.value === value) ? value : '')

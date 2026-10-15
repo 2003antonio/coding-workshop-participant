@@ -26,7 +26,8 @@ import EmployeeFormDialog from '../components/EmployeeFormDialog'
 import MaskedMoney from '../components/MaskedMoney'
 import Paginated from '../components/Paginated'
 import { FilterBar, SearchField, SelectFilter, SwitchFilter } from '../components/filters/Filters'
-import { emptyText, matches, optionsFrom, optionsOf, searchTerm } from '../components/filters/filterMath'
+import { chosen, emptyText, matches, optionsFrom, optionsOf, searchTerm } from '../components/filters/filterMath'
+import { anyValue, useUrlFilter, useUrlFlag } from '../hooks/useUrlFilter'
 import PageHeader from '../components/PageHeader'
 import { PersonName } from '../components/viz/Avatar'
 import { LoadState } from '../components/PageState'
@@ -108,10 +109,11 @@ export default function EmployeesPage() {
   const allowed = EMPLOYEE_LIST_ROLES.includes(role)
   const isAdmin = canManageEmployees(role)
 
-  const [showArchived, setShowArchived] = useState(false)
+  // Filters in the address (?role=manager&team=…&archived=1) so a link can open them; search stays here.
+  const [showArchived, setShowArchived] = useUrlFlag('archived')
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
-  const [teamFilter, setTeamFilter] = useState('') // a team id, NO_TEAM, or '' for all
+  const [roleFilter, setRoleFilter] = useUrlFilter('role', Object.keys(ROLE_LABELS))
+  const [teamParam, setTeamFilter] = useUrlFilter('team', anyValue) // a team id, NO_TEAM, or '' for all
   const toast = useToast()
   const [warning, setWarning] = useState('')
   const [problem, setProblem] = useState('') // why an unarchive was refused
@@ -204,6 +206,10 @@ export default function EmployeesPage() {
     )
   }
 
+  const teamOptions = [{ value: NO_TEAM, label: 'No team' },
+    ...optionsFrom(teams ?? [], (t) => ({ value: t.id, label: t.name }))]
+  const teamFilter = chosen(teamParam, teamOptions)
+
   // Columns: email, job title and team move under the name on a phone.
   const columnCount = (isPhone ? 2 : 5) + (isAdmin ? 2 : 0)
 
@@ -222,8 +228,7 @@ export default function EmployeesPage() {
         <SelectFilter label="Role" allLabel="All roles" value={roleFilter} onChange={setRoleFilter}
           options={optionsOf(ROLE_LABELS)} />
         <SelectFilter label="Team" allLabel="All teams" value={teamFilter} onChange={setTeamFilter}
-          options={[{ value: NO_TEAM, label: 'No team' },
-            ...optionsFrom(teams ?? [], (t) => ({ value: t.id, label: t.name }))]} />
+          options={teamOptions} />
         {isAdmin && <SwitchFilter label="Show archived" checked={showArchived} onChange={setShowArchived} />}
       </FilterBar>
 

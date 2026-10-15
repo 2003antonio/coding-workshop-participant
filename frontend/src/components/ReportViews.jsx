@@ -1,5 +1,8 @@
 // One component per report in docs/api-contract.md §8. Each loads its own data
 // and shows loading, empty and error states. Money follows the hiding rule.
+// Filters live in the address (?status=, ?team=, ?reason=, ?overdue=1, ?over=1;
+// hooks/useUrlFilter.js), so Home's cards open a report already filtered. Switching
+// tabs starts with none (ReportsPage keeps only ?report=). Search text stays local.
 import { useCallback, useState } from 'react'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
@@ -27,7 +30,8 @@ import CapacityHeatmap, { HeatLegend } from './heatmap/CapacityHeatmap'
 import { shiftWeek } from './heatmap/heatScale'
 import { Empty, LoadState } from './PageState'
 import { FilterBar, SearchField, SelectFilter, SwitchFilter } from './filters/Filters'
-import { emptyText, matches, optionsFrom, optionsOf, searchTerm } from './filters/filterMath'
+import { chosen, emptyText, matches, optionsFrom, optionsOf, searchTerm } from './filters/filterMath'
+import { anyValue, useUrlFilter, useUrlFlag } from '../hooks/useUrlFilter'
 import Paginated from './Paginated'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
@@ -51,16 +55,17 @@ export function ProjectStatusReport() {
   const load = useCallback((call) => call((token) => reportService.projectStatus(token)), [])
   const result = useLoad(load)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [teamId, setTeamId] = useState('')
+  const [status, setStatus] = useUrlFilter('status', Object.keys(PROJECT_STATUS))
+  const [teamParam, setTeamId] = useUrlFilter('team', anyValue)
+  const teamOptions = teamsIn(result.data?.projects)
+  const teamId = chosen(teamParam, teamOptions)
   return (
     <>
       <FilterBar label="Filter project status" columns="2fr 1fr 1fr">
         <SearchField label="Search projects" value={search} onChange={setSearch} />
         <SelectFilter label="Status" allLabel="All statuses" value={status} onChange={setStatus}
           options={optionsOf(PROJECT_STATUS)} />
-        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
-          options={teamsIn(result.data?.projects)} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId} options={teamOptions} />
       </FilterBar>
     <LoadState result={result} label="Loading project status" skeleton="table">
       {(data) => {
@@ -109,8 +114,10 @@ export function AtRiskReport() {
   const load = useCallback((call) => call((token) => reportService.atRiskProjects(token)), [])
   const result = useLoad(load)
   const [search, setSearch] = useState('')
-  const [reason, setReason] = useState('')
-  const [teamId, setTeamId] = useState('')
+  const [reason, setReason] = useUrlFilter('reason', Object.keys(RISK_REASONS))
+  const [teamParam, setTeamId] = useUrlFilter('team', anyValue)
+  const teamOptions = teamsIn(result.data?.projects)
+  const teamId = chosen(teamParam, teamOptions)
   const filter = (projects) => {
     const term = searchTerm(search)
     const rows = projects.filter((p) => matches(term, p.name, p.team?.name, p.manager?.name)
@@ -124,8 +131,7 @@ export function AtRiskReport() {
         <SearchField label="Search at-risk projects" value={search} onChange={setSearch} />
         <SelectFilter label="Reason" allLabel="All reasons" value={reason} onChange={setReason}
           options={optionsOf(RISK_REASONS)} />
-        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
-          options={teamsIn(result.data?.projects)} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId} options={teamOptions} />
       </FilterBar>
     <LoadState result={result} label="Loading at-risk projects" skeleton="cards">
       {(data) => {
@@ -170,16 +176,17 @@ export function ResourcesReport() {
   const loadTeams = useCallback((call) => call((token) => teamService.listTeams(token)), [])
   const teams = useLoad(loadTeams)
   const [search, setSearch] = useState('')
-  const [teamId, setTeamId] = useState('') // a team id, NO_TEAM, or '' for everyone
+  const [teamParam, setTeamId] = useUrlFilter('team', anyValue) // a team id, NO_TEAM, or '' for everyone
+  const teamOptions = [{ value: NO_TEAM, label: 'No team' },
+    ...optionsFrom(teams.data ?? [], (t) => ({ value: t.id, label: t.name }))]
+  const teamId = chosen(teamParam, teamOptions)
   const first = result.data?.weeks?.[0]
   const span = result.data?.weeks?.length || RESOURCE_WEEKS
   return (
     <>
       <FilterBar label="Filter people" columns="2fr 1fr">
         <SearchField label="Search people" value={search} onChange={setSearch} />
-        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
-          options={[{ value: NO_TEAM, label: 'No team' },
-            ...optionsFrom(teams.data ?? [], (t) => ({ value: t.id, label: t.name }))]} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId} options={teamOptions} />
       </FilterBar>
       <Box component="nav" aria-label="Weeks shown" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 }}>
         <Button size="small" variant="outlined" sx={{ minHeight: 44 }} disabled={!first}
@@ -217,14 +224,14 @@ export function ResourcesReport() {
 
 /** 4. Deliverable status, ordered by due date, optionally only the overdue ones. */
 export function DeliverablesReport() {
-  const [overdueOnly, setOverdueOnly] = useState(false)
+  const [overdueOnly, setOverdueOnly] = useUrlFlag('overdue')
   const load = useCallback(
     (call) => call((token) => reportService.deliverableStatus(token, { overdue: overdueOnly || undefined })),
     [overdueOnly],
   )
   const result = useLoad(load)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useUrlFilter('status', Object.keys(DELIVERABLE_STATUS))
   return (
     <>
       <FilterBar label="Filter deliverables" columns="2fr 1fr auto">
@@ -378,15 +385,16 @@ export function BudgetReport() {
   const load = useCallback((call) => call((token) => reportService.budgetReport(token)), [])
   const result = useLoad(load)
   const [search, setSearch] = useState('')
-  const [teamId, setTeamId] = useState('')
-  const [overOnly, setOverOnly] = useState(false)
+  const [teamParam, setTeamId] = useUrlFilter('team', anyValue)
+  const [overOnly, setOverOnly] = useUrlFlag('over')
+  const teamOptions = optionsFrom(result.data?.teams ?? [], (t) => ({ value: t.id, label: t.name }))
+  const teamId = chosen(teamParam, teamOptions)
   const note = (row) => (row.hidden_reason ? hiddenMessage(row.hidden_reason) : '')
   return (
     <>
       <FilterBar label="Filter budgets" columns="2fr 1fr auto">
         <SearchField label="Search budgets" value={search} onChange={setSearch} />
-        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
-          options={optionsFrom(result.data?.teams ?? [], (t) => ({ value: t.id, label: t.name }))} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId} options={teamOptions} />
         <SwitchFilter label="Only over budget" checked={overOnly} onChange={setOverOnly} />
       </FilterBar>
     <LoadState result={result} label="Loading budget report" skeleton="table">

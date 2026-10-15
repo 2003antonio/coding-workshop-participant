@@ -10,7 +10,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
 import TableRowsOutlined from '@mui/icons-material/TableRowsOutlined'
-import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { canCreateProjects, canManageProject } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
@@ -30,6 +30,7 @@ import * as teamService from '../services/teamService'
 import { MUTED_ROW_SX, clickableCardSx } from '../theme'
 import { FilterBar, SearchField, SelectFilter, SwitchFilter } from '../components/filters/Filters'
 import { SEARCH_DELAY_MS, emptyText, optionsOf, searchTerm } from '../components/filters/filterMath'
+import { anyValue, useUrlFilter, useUrlFlag } from '../hooks/useUrlFilter'
 import { messageFor } from './apiMessages'
 import { PROJECT_STATUS, formatDate } from './format'
 
@@ -89,14 +90,11 @@ export default function ProjectsPage() {
 
   const [search, setSearch] = useState('') // what is in the box
   const [query, setQuery] = useState('') // what was last sent as q (trimmed)
-  const [params] = useSearchParams()
-  // ?status=active (from a Home card) picks the filter on first load; anything unknown means all.
-  const [status, setStatus] = useState(() => {
-    const asked = params.get('status') ?? ''
-    return Object.hasOwn(PROJECT_STATUS, asked) ? asked : ''
-  })
-  const [teamId, setTeamId] = useState('')
-  const [showArchived, setShowArchived] = useState(false)
+  // The filters live in the address (?status=active&team=…&archived=1), so Home's cards can
+  // open the list filtered; an unknown status means all. The team goes to the server as asked.
+  const [status, setStatus] = useUrlFilter('status', Object.keys(PROJECT_STATUS))
+  const [teamId, setTeamId] = useUrlFilter('team', anyValue)
+  const [showArchived, setShowArchived] = useUrlFlag('archived')
   const toast = useToast()
   const [problem, setProblem] = useState('') // why an unarchive was refused
   const [restoring, setRestoring] = useState(null) // id of the project being unarchived

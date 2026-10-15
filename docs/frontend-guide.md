@@ -161,6 +161,12 @@ const rows = all.filter((e) => matches(term, e.name, e.email) && (!role || e.rol
   that changes the row count sends it back to page 1.
 - `matches` works like the server's `q`: case-insensitive, plain text. A list the
   server can search (Projects) sends `q` after `SEARCH_DELAY_MS` instead.
+- Dropdowns and switches keep their value in the address with `useUrlFilter` /
+  `useUrlFlag` (`hooks/useUrlFilter.js`): `const [role, setRole] = useUrlFilter('role', Object.keys(ROLE_LABELS))`.
+  Then a link opens the list already filtered (Home's cards link to
+  `/reports?tab=deliverables&overdue=1`, listed in `DASHBOARD_LINKS`), and Back,
+  refresh and a shared link keep it. For a team id use `anyValue`, and filter with
+  `chosen(value, options)` so an id nobody can see filters nothing. Search text stays in state.
 - Keep the names: the bar is "Filter <things>", the box "Search <things>", the
   first dropdown choice "All <things>". Tests and E2E find them by these names.
 

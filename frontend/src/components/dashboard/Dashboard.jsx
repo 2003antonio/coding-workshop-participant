@@ -12,7 +12,7 @@ import AtRiskList from './AtRiskList'
 import BudgetBars from './BudgetBars'
 import DashboardSection from './DashboardSection'
 import {
-  activeCount, atRiskCount, DASHBOARD_LIST_LIMIT, nearCapacityCount, overBudgetCount, overdueCount, portfolioHealth,
+  activeCount, atRiskCount, DASHBOARD_LINKS, DASHBOARD_LIST_LIMIT, nearCapacityCount, overBudgetCount, overdueCount, portfolioHealth,
   topAtRisk, topBudgets,
 } from './dashboardMath'
 import StatCard from './StatCard'
@@ -56,8 +56,8 @@ function PortfolioHealth({ status, risk, budget }) {
         </Typography>
         <StatusBar label="Projects by health" height={12} segments={[
           { key: 'healthy', label: 'Healthy', count: h.healthy, tone: 'done' },
-          { key: 'at_risk', label: 'At risk', count: h.at_risk, tone: 'blocked' },
-          { key: 'over_budget', label: 'Over budget', count: h.over_budget, tone: 'overdue' },
+          { key: 'at_risk', label: 'At risk', count: h.at_risk, tone: 'blocked', to: DASHBOARD_LINKS.atRisk },
+          { key: 'over_budget', label: 'Over budget', count: h.over_budget, tone: 'overdue', to: DASHBOARD_LINKS.overBudget },
         ]} />
         {h.hidden > 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -104,14 +104,14 @@ export default function Dashboard({ role }) {
         <PortfolioHealth status={status} risk={risk} budget={budget} />
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
           <StatCard id="stat-active" title="Active projects" result={status} count={activeCount}
-            to="/projects?status=active" />
-          <StatCard id="stat-risk" title="At risk" result={risk} count={atRiskCount} to="/reports?tab=at-risk" />
+            to={DASHBOARD_LINKS.active} />
+          <StatCard id="stat-risk" title="At risk" result={risk} count={atRiskCount} to={DASHBOARD_LINKS.atRisk} />
           <StatCard id="stat-overdue" title="Overdue deliverables" result={status} count={overdueCount}
-            to="/reports?tab=deliverables" />
+            to={DASHBOARD_LINKS.overdue} />
           <StatCard id="stat-budget" title="Over budget" result={budget} count={overBudgetCount}
-            to="/reports?tab=budget" />
+            to={DASHBOARD_LINKS.overBudget} />
           <StatCard id="stat-capacity" title="Near capacity" result={capacity} count={nearCapacityCount}
-            to="/reports?tab=near-capacity" />
+            to={DASHBOARD_LINKS.nearCapacity} />
         </Box>
       </Box>
 
@@ -129,7 +129,7 @@ export default function Dashboard({ role }) {
           {(data) => (
             <>
               <AtRiskList projects={topAtRisk(data.projects)} />
-              <ViewAll count={data.projects.length} to="/reports?tab=at-risk" what="at-risk projects" />
+              <ViewAll count={data.projects.length} to={DASHBOARD_LINKS.atRisk} what="at-risk projects" />
             </>
           )}
         </DashboardSection>

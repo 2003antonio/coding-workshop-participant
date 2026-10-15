@@ -110,3 +110,12 @@ export function topBudgets(projects, limit = DASHBOARD_LIST_LIMIT) {
     .slice(0, limit)
     .map(({ p }) => p)
 }
+
+/** Where each Home number leads: the list it counts, with its filter already on (hooks/useUrlFilter.js). */
+export const DASHBOARD_LINKS = {
+  active: '/projects?status=active',
+  atRisk: '/reports?tab=at-risk',
+  overdue: '/reports?tab=deliverables&overdue=1',
+  overBudget: '/reports?tab=budget&over=1',
+  nearCapacity: '/reports?tab=near-capacity',
+}
