@@ -62,7 +62,7 @@ describe('Employees page: what each role sees', () => {
 
     await table()
     expect(columnHeaders()).toEqual(['Name', 'Email', 'Job title', 'Team', 'Role', 'Salary', 'Actions'])
-    expect(within(rowFor('Eve Employee')).getByText('90,000.50')).toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByText('$90,000.50')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add employee' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit Eve Employee' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Archive Eve Employee' })).toBeEnabled()
@@ -189,7 +189,7 @@ describe('errors', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
     expect(await table()).toBeInTheDocument()
-    expect(within(rowFor('Eve Employee')).getByText('90,000.50')).toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByText('$90,000.50')).toBeInTheDocument()
     expect(server.count('GET', '/api/employees/')).toBe(2)
     expect(screen.queryByText('Something went wrong. Please try again.')).not.toBeInTheDocument()
   })

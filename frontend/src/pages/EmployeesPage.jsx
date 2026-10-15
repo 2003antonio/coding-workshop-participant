@@ -32,7 +32,7 @@ import { messageFor } from './employeeMessages'
 import { teamName } from './people'
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
-const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** Ask before archiving; the record is kept, the person can no longer sign in. */
 function ArchiveDialog({ employee, onClose, onConfirm }) {
