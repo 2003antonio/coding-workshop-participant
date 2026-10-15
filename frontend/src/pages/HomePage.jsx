@@ -5,6 +5,7 @@ import { canSeeDashboard } from '../auth/roles'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import Dashboard from '../components/dashboard/Dashboard'
+import MyWorkView from '../components/mywork/MyWorkView'
 import { useBreakpoint } from '../hooks/useBreakpoint'
 import { ROLE_LABELS } from './format'
 
@@ -25,7 +26,7 @@ export default function HomePage() {
         <Typography color="text.secondary">Signed in as</Typography>
         <Chip label={ROLE_LABELS[role] ?? role} color="primary" size="small" />
       </Box>
-      {canSeeDashboard(role) && <Dashboard role={role} />}
+      {canSeeDashboard(role) ? <Dashboard role={role} /> : <MyWorkView />}
     </AppShell>
   )
 }

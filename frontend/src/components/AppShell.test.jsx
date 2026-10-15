@@ -10,7 +10,7 @@ describe('AppShell', () => {
     renderApp('/projects')
     await screen.findByRole('heading', { level: 1, name: 'Projects' })
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Projects', 'Teams', 'Reports'])
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports'])
     expect(within(nav).getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'page')
     expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
     // The top bar title is plain text: the page keeps the only h1.

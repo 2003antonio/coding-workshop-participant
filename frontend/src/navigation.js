@@ -8,10 +8,12 @@ import BadgeOutlined from '@mui/icons-material/BadgeOutlined'
 import FolderOutlined from '@mui/icons-material/FolderOutlined'
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined'
 import HomeOutlined from '@mui/icons-material/HomeOutlined'
+import WorkOutlined from '@mui/icons-material/WorkOutlined'
 import { EMPLOYEE_LIST_ROLES } from './auth/roles'
 
 export const NAV_ITEMS = [
   { to: '/', label: 'Home', icon: HomeOutlined, end: true },
+  { to: '/my-work', label: 'My work', icon: WorkOutlined },
   { to: '/projects', label: 'Projects', icon: FolderOutlined },
   { to: '/teams', label: 'Teams', icon: GroupsOutlined },
   { to: '/reports', label: 'Reports', icon: AssessmentOutlined },

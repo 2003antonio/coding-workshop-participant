@@ -150,7 +150,7 @@ describe('access rules', () => {
     expect(server.count('GET', '/api/employees/')).toBe(0)
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Projects', 'Teams', 'Reports'])
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports'])
 
     await user.click(within(nav).getByRole('link', { name: 'Teams' }))
     await screen.findByRole('table', { name: 'Teams' })
@@ -169,7 +169,7 @@ describe('access rules', () => {
     await user.click(screen.getByRole('button', { name: 'Menu' }))
     const nav = await screen.findByRole('navigation', { name: 'Main' })
     expect(within(nav).getAllByRole('link').map((m) => m.textContent))
-      .toEqual(['Home', 'Projects', 'Teams', 'Reports', 'Employees'])
+      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Employees'])
     await user.click(within(nav).getByRole('link', { name: 'Projects' }))
     expect(await screen.findByRole('heading', { name: 'Projects' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument())

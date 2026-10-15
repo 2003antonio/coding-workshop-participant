@@ -26,6 +26,7 @@ export const PUBLIC_ROUTES = [
 export const PROTECTED_ROUTES = [
   { path: '/', Page: lazyPage(() => import('./pages/HomePage')) },
   { path: '/employees', Page: lazyPage(() => import('./pages/EmployeesPage')) },
+  { path: '/my-work', Page: lazyPage(() => import('./pages/MyWorkPage')) },
   { path: '/projects', Page: lazyPage(() => import('./pages/ProjectsPage')) },
   { path: '/projects/:id', Page: lazyPage(() => import('./pages/ProjectDetailPage')) },
   { path: '/reports', Page: lazyPage(() => import('./pages/ReportsPage')) },
