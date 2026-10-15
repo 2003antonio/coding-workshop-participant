@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import theme, { STATUS_COLORS, contrastRatio } from './theme'
+import theme, { AVATAR_COLORS, STATUS_COLORS, contrastRatio } from './theme'
 
 const MODES = ['light', 'dark']
 const AA = 4.5
@@ -46,6 +46,19 @@ describe('palette colours used as text or on buttons', () => {
         expect(contrastRatio(text, palette.background.default)).toBeGreaterThanOrEqual(AA)
       }
       expect(contrastRatio(palette.sidebar.fg, palette.sidebar.bg)).toBeGreaterThanOrEqual(AA)
+    })
+  }
+})
+
+describe('avatar and project tile colours', () => {
+  it('have the same number of colours in both modes', () => {
+    expect(AVATAR_COLORS.dark).toHaveLength(AVATAR_COLORS.light.length)
+  })
+  for (const mode of MODES) {
+    AVATAR_COLORS[mode].forEach(({ fg, bg }, i) => {
+      it(`${mode} avatar ${i}: initials on the colour are at least 4.5:1`, () => {
+        expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(AA)
+      })
     })
   }
 })

@@ -31,6 +31,34 @@ export const STATUS_COLORS = {
 }
 
 /**
+ * Avatar and project-tile colours: text (fg) on background (bg) per mode, picked
+ * by a hash of the name (components/viz/vizMath.js). No red or amber, so a
+ * person's colour never reads as a status. theme.test.js checks 4.5:1 for each.
+ */
+export const AVATAR_COLORS = {
+  light: [
+    { fg: '#FFFFFF', bg: '#1F4E8C' },
+    { fg: '#FFFFFF', bg: '#0B6E78' },
+    { fg: '#FFFFFF', bg: '#6B3FA0' },
+    { fg: '#FFFFFF', bg: '#1B6B34' },
+    { fg: '#FFFFFF', bg: '#4A4FA8' },
+    { fg: '#FFFFFF', bg: '#8E2F6E' },
+    { fg: '#FFFFFF', bg: '#3D5266' },
+    { fg: '#FFFFFF', bg: '#0A5A8A' },
+  ],
+  dark: [
+    { fg: '#0A2540', bg: '#A8C8F5' },
+    { fg: '#0A2540', bg: '#8FDCE3' },
+    { fg: '#0A2540', bg: '#D3B8F0' },
+    { fg: '#0A2540', bg: '#9FE3B4' },
+    { fg: '#0A2540', bg: '#BFC3F7' },
+    { fg: '#0A2540', bg: '#F2B8DD' },
+    { fg: '#0A2540', bg: '#C9D1DC' },
+    { fg: '#0A2540', bg: '#9DD3F5' },
+  ],
+}
+
+/**
  * sx for a chip in a status colour: <Chip sx={toneSx('done')} label="Done" />.
  * The label always says the status too, so colour is never the only signal.
  */
@@ -99,6 +127,8 @@ const theme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        // Digits all the same width, so money, hours and percentages line up in columns and do not jiggle on update.
+        body: { fontVariantNumeric: 'tabular-nums' },
         // Respect "reduce motion": no shimmer, no sliding drawers.
         '@media (prefers-reduced-motion: reduce)': {
           '*, *::before, *::after': {
