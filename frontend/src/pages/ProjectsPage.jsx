@@ -1,14 +1,17 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import FormControlLabel from '@mui/material/FormControlLabel'
+import IconButton from '@mui/material/IconButton'
+import InputAdornment from '@mui/material/InputAdornment'
 import Link from '@mui/material/Link'
 import MenuItem from '@mui/material/MenuItem'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
+import ClearOutlined from '@mui/icons-material/ClearOutlined'
 import { useMediaQuery } from 'react-responsive'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { canCreateProjects, canManageProject } from '../auth/roles'
@@ -24,7 +27,12 @@ import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { PROJECT_STATUS, formatDate } from './format'
 
-/** All projects the caller can see (§4 visibility), with search, filters and archive. */
+/** The server's limit for the search text (§4). */
+export const MAX_SEARCH = 100
+/** Wait this long after the last key before searching. */
+export const SEARCH_DELAY_MS = 300
+
+/** All projects the caller can see (§4 visibility), with server-side search, filters and archive. */
 export default function ProjectsPage() {
   const { user, role } = useAuth()
   const api = useApi()
@@ -32,18 +40,28 @@ export default function ProjectsPage() {
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const mayCreate = canCreateProjects(role)
 
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState('') // what is in the box
+  const [query, setQuery] = useState('') // what was last sent as q (trimmed)
+  const searchBox = useRef(null)
   const [status, setStatus] = useState('')
   const [teamId, setTeamId] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [notice, setNotice] = useState('')
   const [dialog, setDialog] = useState(null) // null, { kind: 'create' } or { kind: 'archive', project }
 
+  // Search on the server, SEARCH_DELAY_MS after the last key. useLoad drops the
+  // answer to an older search, so a slow reply never replaces a newer one.
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(search.trim().slice(0, MAX_SEARCH)), SEARCH_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const loadProjects = useCallback(
     (call) => call((token) => projectService.listProjects(token, {
-      teamId: teamId || undefined, status: status || undefined, includeArchived: mayCreate && showArchived,
+      teamId: teamId || undefined, status: status || undefined, q: query || undefined,
+      includeArchived: mayCreate && showArchived,
     })),
-    [teamId, status, mayCreate, showArchived],
+    [teamId, status, query, mayCreate, showArchived],
   )
   const projects = useLoad(loadProjects)
   const loadTeams = useCallback((call) => call((token) => teamService.listTeams(token)), [])
@@ -57,9 +75,15 @@ export default function ProjectsPage() {
     return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
   }, [teams.data, projects.data])
 
-  const needle = search.trim().toLowerCase()
-  const matches = (p) => !needle || p.name.toLowerCase().includes(needle)
-    || p.description?.toLowerCase().includes(needle)
+  function clearSearch() {
+    setSearch('')
+    setQuery('')
+    searchBox.current?.focus()
+  }
+
+  let emptyText = 'No projects to show yet.'
+  if (query) emptyText = `No projects match '${query}'.`
+  else if (status || teamId) emptyText = 'No projects match these filters.'
 
   async function handleCreate(payload) {
     const created = await api((token) => projectService.createProject(token, payload))
@@ -89,8 +113,20 @@ export default function ProjectsPage() {
         display: 'grid', gap: 2, mb: 2, alignItems: 'center',
         gridTemplateColumns: isPhone ? '1fr' : '2fr 1fr 1fr auto',
       }}>
-        <TextField label="Search projects" type="search" size="small" value={search}
-          onChange={(e) => setSearch(e.target.value)} />
+        <TextField label="Search projects" type="search" size="small" value={search} inputRef={searchBox}
+          onChange={(e) => setSearch(e.target.value)}
+          slotProps={{
+            htmlInput: { maxLength: MAX_SEARCH },
+            input: search ? {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton aria-label="Clear search" edge="end" onClick={clearSearch} sx={{ width: 44, height: 44 }}>
+                    <ClearOutlined fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            } : undefined,
+          }} />
         <TextField select label="Status" size="small" value={status} onChange={(e) => setStatus(e.target.value)}>
           <MenuItem value="">All statuses</MenuItem>
           {Object.entries(PROJECT_STATUS).map(([value, label]) => (
@@ -114,11 +150,8 @@ export default function ProjectsPage() {
 
       <LoadState result={projects} label="Loading projects" skeleton="table">
         {(rows) => {
-          const shown = rows.filter(matches)
-          const filtered = Boolean(needle || status || teamId)
           return (
-            <ResponsiveTable label="Projects" rows={shown}
-              empty={filtered ? 'No projects match these filters.' : 'No projects to show yet.'}
+            <ResponsiveTable label="Projects" rows={rows} empty={emptyText}
               columns={[
                 { key: 'name', label: 'Project', primary: true, render: (p) => (
                   <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
