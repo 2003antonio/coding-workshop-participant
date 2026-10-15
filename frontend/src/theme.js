@@ -67,6 +67,9 @@ export const toneSx = (tone) => (theme) => {
   return colors ? { color: colors.fg, bgcolor: colors.bg } : {}
 }
 
+/** A muted (archived) row: a faint background and secondary text; links and buttons keep their colour. */
+export const MUTED_ROW_SX = { bgcolor: 'action.hover', '& td, & th, & dd, & dt, & h3': { color: 'text.secondary' } }
+
 /** Brand colours from the design brief. */
 export const BRAND = { navy: '#0A2540', blue: '#1F4E8C', teal: '#0B7A86' }
 

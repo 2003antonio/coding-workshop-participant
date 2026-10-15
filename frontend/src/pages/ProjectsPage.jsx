@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -34,6 +35,8 @@ import { useToast } from '../components/toast/toast'
 import ProjectTile, { ProjectName } from '../components/viz/ProjectTile'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
+import { MUTED_ROW_SX } from '../theme'
+import { messageFor } from './apiMessages'
 import { PROJECT_STATUS, formatDate } from './format'
 
 /** The server's limit for the search text (§4). */
@@ -62,11 +65,11 @@ function ProjectCards({ rows, empty, archiveButton }) {
       gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))',
     }}>
       {rows.map((p, i) => (
-        <Paper component="li" key={p.id} variant="outlined" sx={[{
+        <Paper component="li" key={p.id} variant="outlined" data-muted={p.archived_at ? true : undefined} sx={[{
           p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0,
           transition: 'border-color 150ms, box-shadow 150ms',
           '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
-        }, motion('enter', i)]}>
+        }, p.archived_at ? MUTED_ROW_SX : {}, motion('enter', i)]}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
             <ProjectTile name={p.name} size={40} />
             <Box sx={{ minWidth: 0 }}>
@@ -110,6 +113,8 @@ export default function ProjectsPage() {
   const [teamId, setTeamId] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const toast = useToast()
+  const [problem, setProblem] = useState('') // why an unarchive was refused
+  const [restoring, setRestoring] = useState(null) // id of the project being unarchived
   const [dialog, setDialog] = useState(null) // null, { kind: 'create' } or { kind: 'archive', project }
   const [view, setView] = useState(savedView) // 'table' (default) or 'cards'
 
@@ -172,6 +177,20 @@ export default function ProjectsPage() {
     projects.reload()
   }
 
+  async function handleUnarchive(project) {
+    setProblem('')
+    setRestoring(project.id)
+    try {
+      const restored = await api((token) => projectService.unarchiveProject(token, project.id))
+      toast(`Project unarchived: ${restored.name}`)
+      projects.reload()
+    } catch (error) {
+      setProblem(`${project.name}: ${messageFor(error)}`)
+    } finally {
+      setRestoring(null)
+    }
+  }
+
   return (
     <AppShell>
       <PageHeader title="Projects" subtitle="Every project you can see. Search, filter by status or team, and open one."
@@ -224,17 +243,30 @@ export default function ProjectsPage() {
         </ToggleButtonGroup>
       </Box>
 
+      {problem && <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>}
+
       <LoadState result={projects} label="Loading projects" skeleton="table">
         {(rows) => {
-          const archiveButton = (p) => (mayCreate && canManageProject(role, user, p) && !p.archived_at ? (
-            <Button size="small" color="error" aria-label={`Archive ${p.name}`}
-              onClick={() => setDialog({ kind: 'archive', project: p })}>
-              Archive
-            </Button>
-          ) : null)
+          const archiveButton = (p) => {
+            if (!mayCreate || !canManageProject(role, user, p)) return null
+            if (p.archived_at) {
+              return (
+                <Button size="small" aria-label={`Unarchive ${p.name}`} disabled={restoring === p.id}
+                  onClick={() => handleUnarchive(p)}>
+                  Unarchive
+                </Button>
+              )
+            }
+            return (
+              <Button size="small" color="error" aria-label={`Archive ${p.name}`}
+                onClick={() => setDialog({ kind: 'archive', project: p })}>
+                Archive
+              </Button>
+            )
+          }
           if (view === 'cards') return <ProjectCards rows={rows} empty={emptyText} archiveButton={archiveButton} />
           return (
-            <ResponsiveTable label="Projects" rows={rows} empty={emptyText}
+            <ResponsiveTable label="Projects" rows={rows} empty={emptyText} muted={(p) => Boolean(p.archived_at)}
               columns={[
                 { key: 'name', label: 'Project', primary: true, render: (p) => (
                   <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>

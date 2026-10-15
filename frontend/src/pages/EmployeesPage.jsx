@@ -32,6 +32,7 @@ import { LoadState } from '../components/PageState'
 import { useToast } from '../components/toast/toast'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
+import { MUTED_ROW_SX } from '../theme'
 import { messageFor as teamMessageFor } from './apiMessages'
 import { messageFor } from './employeeMessages'
 import { teamLabel } from './people'
@@ -107,6 +108,8 @@ export default function EmployeesPage() {
   const [showArchived, setShowArchived] = useState(false)
   const toast = useToast()
   const [warning, setWarning] = useState('')
+  const [problem, setProblem] = useState('') // why an unarchive was refused
+  const [restoring, setRestoring] = useState(null) // id of the employee being unarchived
   // null, { kind: 'create' }, { kind: 'edit', employee } or { kind: 'archive', employee }
   const [dialog, setDialog] = useState(null)
 
@@ -172,6 +175,20 @@ export default function EmployeesPage() {
     finish(`Employee archived: ${archived.name}`)
   }
 
+  /** Bring an archived person back: the record only (their old team and assignments stay as they were). */
+  async function handleUnarchive(employee) {
+    setProblem('')
+    setRestoring(employee.id)
+    try {
+      const restored = await api((token) => employeeService.unarchiveEmployee(token, employee.id))
+      finish(`Employee unarchived: ${restored.name}`)
+    } catch (error) {
+      setProblem(`${employee.name}: ${messageFor(error)}`)
+    } finally {
+      setRestoring(null)
+    }
+  }
+
   if (!allowed) {
     return (
       <AppShell>
@@ -198,6 +215,10 @@ export default function EmployeesPage() {
             </Button>
           </>
         )} />
+
+      {problem && (
+        <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>
+      )}
 
       {warning && (
         <Alert severity="warning" onClose={() => setWarning('')} sx={{ mb: 2 }}>{warning}</Alert>
@@ -228,7 +249,7 @@ export default function EmployeesPage() {
                 const archived = Boolean(employee.archived_at)
                 const isSelf = employee.id === user?.id
                 return (
-                  <TableRow key={employee.id} hover>
+                  <TableRow key={employee.id} hover data-muted={archived || undefined} sx={archived ? MUTED_ROW_SX : undefined}>
                     <TableCell component="th" scope="row">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <PersonName name={employee.name} size={30} />
@@ -262,6 +283,12 @@ export default function EmployeesPage() {
                     )}
                     {isAdmin && (
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                        {archived && (
+                          <Button size="small" aria-label={`Unarchive ${employee.name}`}
+                            disabled={restoring === employee.id} onClick={() => handleUnarchive(employee)}>
+                            Unarchive
+                          </Button>
+                        )}
                         {!archived && (
                           <>
                             <Button size="small" aria-label={`Edit ${employee.name}`}

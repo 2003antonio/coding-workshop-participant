@@ -331,6 +331,13 @@ function createApi(db, meId, today) {
       Object.assign(row, body)
       return reply(200, employeeView(row))
     }],
+    ['POST', /^\/api\/employees\/(?<id>[^/]+)\/unarchive$/, ({ params }) => {
+      if (!isAdmin()) return forbidden()
+      const row = byId('employees', params.id)
+      if (!row || !row.archived_at) return notFound()
+      row.archived_at = null
+      return reply(200, employeeView(row))
+    }],
 
     // ---- teams ----
     ['GET', /^\/api\/teams\/$/, ({ query }) => {
@@ -437,6 +444,15 @@ function createApi(db, meId, today) {
       if (!canManageProject(project)) return forbidden()
       if (project.archived_at) return err(409, 'already_archived')
       project.archived_at = `${today}T12:00:00+00:00`
+      return reply(200, projectView(project))
+    }],
+    ['POST', /^\/api\/projects\/(?<id>[^/]+)\/unarchive$/, ({ params }) => {
+      const project = visibleProject(params.id)
+      if (!project) return notFound()
+      if (!canManageProject(project)) return forbidden()
+      if (!project.archived_at) return notFound()
+      if (!active(byId('teams', project.team_id))) return err(409, 'team_archived')
+      project.archived_at = null
       return reply(200, projectView(project))
     }],
     ['GET', /^\/api\/projects\/(?<id>[^/]+)\/budget$/, ({ params }) => {

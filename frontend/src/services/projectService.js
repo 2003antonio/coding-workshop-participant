@@ -30,6 +30,11 @@ export function updateProject(accessToken, id, changes) {
   return request(project(id), accessToken, { method: 'PUT', body: changes })
 }
 
+/** POST /{id}/unarchive (admin; the team's manager) -> the project, active again */
+export function unarchiveProject(accessToken, id) {
+  return request(`${project(id)}/unarchive`, accessToken, { method: 'POST' })
+}
+
 /** POST /{id}/archive -> the archived project (its deliverables and allocations go with it) */
 export function archiveProject(accessToken, id) {
   return request(`${project(id)}/archive`, accessToken, { method: 'POST' })

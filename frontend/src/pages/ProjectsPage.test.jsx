@@ -107,7 +107,8 @@ describe('Projects list: search and filters', () => {
     await user.click(screen.getByRole('switch', { name: 'Show archived' }))
     await waitFor(() => expect(within(rowFor('Old Portal')).getByText('Archived')).toBeInTheDocument())
     expect(lastList(server).query).toBe('?include_archived=true')
-    expect(within(rowFor('Old Portal')).queryByRole('button')).not.toBeInTheDocument()
+    // An archived row offers only Unarchive (no Archive).
+    expect(within(rowFor('Old Portal')).getAllByRole('button').map((b) => b.textContent)).toEqual(['Unarchive'])
   })
 })
 
