@@ -479,8 +479,9 @@ describe('Project detail: health strip', () => {
     signedInAs('admin')
     renderApp('/projects/p-1')
     const strip = await screen.findByTestId('health-strip')
-    expect(within(strip).getAllByRole('region').map((r) => r.getAttribute('aria-label')))
-      .toEqual(expect.arrayContaining(['Budget', 'Budget summary', 'Schedule', 'People']))
+    // The budget summary arrives with its own request: wait for it (this raced under a busy CPU).
+    await waitFor(() => expect(within(strip).getAllByRole('region').map((r) => r.getAttribute('aria-label')))
+      .toEqual(expect.arrayContaining(['Budget', 'Budget summary', 'Schedule', 'People'])))
     expect(await within(strip).findByRole('list', { name: 'Deliverables by status' })).toBeInTheDocument()
     expect(await within(strip).findByRole('img', { name: /^\d+ (person|people): / })).toBeInTheDocument()
   })

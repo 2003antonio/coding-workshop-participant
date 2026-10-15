@@ -96,11 +96,11 @@ export default function TeamDetailPage() {
 
   return (
     <AppShell>
-      <Link component={RouterLink} to="/teams" sx={{ display: 'inline-block', mb: 2 }}>← All teams</Link>
       <LoadState result={team} label="Loading team" skeleton="detail">
         {(data) => (
           <Stack spacing={3}>
-            <PageHeader title={data.name} subtitle={`Lead: ${data.lead?.name ?? 'none'}`} icon={<ProjectTile name={data.name} size={48} />}
+            <PageHeader title={data.name} breadcrumbs={[{ label: 'Teams', to: '/teams' }, { label: data.name }]}
+              subtitle={`Lead: ${data.lead?.name ?? 'none'}`} icon={<ProjectTile name={data.name} size={48} />}
               actions={isAdmin && !data.archived_at && (
                 <>
                   <Button variant="outlined" onClick={() => setDialog({ kind: 'edit' })}

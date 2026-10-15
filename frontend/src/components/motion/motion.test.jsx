@@ -77,7 +77,7 @@ describe('what moves on screen', () => {
     expect(animationOf(screen.getByRole('img', { name: /^A:/ }))).toMatch(/200ms/)
 
     // A new page gets a new wrapper, so the fade plays again.
-    await user.click(screen.getByRole('link', { name: '← All projects' }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Projects' }))
     await screen.findByRole('heading', { level: 1, name: 'Projects' })
     expect(screen.getByTestId('page-transition')).not.toBe(page)
   })

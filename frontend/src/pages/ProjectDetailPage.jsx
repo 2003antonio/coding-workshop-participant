@@ -79,7 +79,6 @@ export default function ProjectDetailPage() {
   return (
     <AppShell>
       <ProjectRefreshContext.Provider value={refreshValue}>
-        <Link component={RouterLink} to="/projects" sx={{ display: 'inline-block', mb: 2 }}>← All projects</Link>
         <LoadState result={result} label="Loading project" skeleton="detail">
           {(project) => {
             const canManage = canManageProject(role, user, project)
@@ -93,7 +92,8 @@ export default function ProjectDetailPage() {
             const current = tabs.some(([key]) => key === tab) ? tab : 'deliverables'
             return (
               <>
-                <PageHeader title={project.name} icon={<ProjectTile name={project.name} size={isPhone ? 40 : 48} />}
+                <PageHeader title={project.name} breadcrumbs={[{ label: 'Projects', to: '/projects' }, { label: project.name }]}
+                  icon={<ProjectTile name={project.name} size={isPhone ? 40 : 48} />}
                   subtitle={`${project.team.name} · Manager: ${project.manager?.name ?? 'none'} · `
                     + `${formatDate(project.start_date)} – ${formatDate(project.end_date)}`}
                   actions={canEdit && (
