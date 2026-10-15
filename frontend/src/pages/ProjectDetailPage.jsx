@@ -16,6 +16,7 @@ import { useBreakpoint } from '../hooks/useBreakpoint'
 import AllocationsSection from '../components/AllocationsSection'
 import AppShell from '../components/AppShell'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/PageHeader'
 import DeliverablesSection from '../components/DeliverablesSection'
 import { LoadState } from '../components/PageState'
 import ProjectBudgetSection, { ProjectBudgetBar } from '../components/ProjectBudgetSection'
@@ -67,7 +68,7 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <AppShell maxWidth="lg">
+    <AppShell>
       <Link component={RouterLink} to="/projects" sx={{ display: 'inline-block', mb: 2 }}>← All projects</Link>
       <LoadState result={result} label="Loading project" skeleton="detail">
         {(project) => {
@@ -82,29 +83,27 @@ export default function ProjectDetailPage() {
           const current = tabs.some(([key]) => key === tab) ? tab : 'deliverables'
           return (
             <>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-                <Box sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-                    <Typography variant={isPhone ? 'h5' : 'h4'} component="h1">{project.name}</Typography>
-                    <StatusChip status={project.status} />
-                    {project.archived_at && <Chip label="Archived" size="small" />}
-                  </Box>
-                  <Typography color="text.secondary">
-                    {project.team.name} · Manager: {project.manager?.name ?? 'none'} ·{' '}
-                    {formatDate(project.start_date)} – {formatDate(project.end_date)}
-                  </Typography>
-                  {project.description && <Typography sx={{ mt: 1 }}>{project.description}</Typography>}
-                  {canManage && <Box sx={{ mt: 1.5 }}><ProjectBudgetBar project={project} /></Box>}
-                </Box>
-                {canEdit && (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+              <PageHeader title={project.name}
+                subtitle={`${project.team.name} · Manager: ${project.manager?.name ?? 'none'} · `
+                  + `${formatDate(project.start_date)} – ${formatDate(project.end_date)}`}
+                actions={canEdit && (
+                  <>
                     <Button variant="outlined" onClick={() => setEditing(true)} disabled={teams.status === 'loading'}>
                       Edit project
                     </Button>
                     <Button color="error" variant="outlined" onClick={() => setArchiving(true)}>Archive project</Button>
-                  </Box>
+                  </>
                 )}
-              </Box>
+                after={(
+                  <>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mt: 1 }}>
+                      <StatusChip status={project.status} />
+                      {project.archived_at && <Chip label="Archived" size="small" />}
+                    </Box>
+                    {project.description && <Typography sx={{ mt: 1 }}>{project.description}</Typography>}
+                    {canManage && <Box sx={{ mt: 2 }}><ProjectBudgetBar project={project} /></Box>}
+                  </>
+                )} />
               {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
 
               <Paper variant="outlined" sx={{ mb: 2 }}>

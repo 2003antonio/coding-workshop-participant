@@ -3,13 +3,12 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Link from '@mui/material/Link'
-import Typography from '@mui/material/Typography'
-import { useMediaQuery } from 'react-responsive'
 import { Link as RouterLink } from 'react-router-dom'
 import { canManageTeams } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
+import PageHeader from '../components/PageHeader'
 import { LoadState } from '../components/PageState'
 import ResponsiveTable from '../components/ResponsiveTable'
 import { TeamFormDialog } from '../components/TeamDialogs'
@@ -24,7 +23,6 @@ import { leadCandidates } from './people'
 export default function TeamsPage() {
   const { role } = useAuth()
   const api = useApi()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
   const isAdmin = canManageTeams(role)
   const [creating, setCreating] = useState(false)
   const [notice, setNotice] = useState('')
@@ -51,15 +49,13 @@ export default function TeamsPage() {
   }[role]
 
   return (
-    <AppShell maxWidth="lg">
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Typography variant={isPhone ? 'h5' : 'h4'} component="h1" sx={{ flexGrow: 1 }}>Teams</Typography>
-        {isAdmin && (
+    <AppShell>
+      <PageHeader title="Teams" subtitle="Who leads each team and how many people are on it."
+        actions={isAdmin && (
           <Button variant="contained" onClick={() => setCreating(true)} disabled={people.status !== 'ready'}>
             New team
           </Button>
-        )}
-      </Box>
+        )} />
       {notice && (
         <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>
       )}

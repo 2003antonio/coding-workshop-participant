@@ -19,6 +19,7 @@ import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/PageHeader'
 import { LoadState } from '../components/PageState'
 import ProjectFormDialog from '../components/ProjectFormDialog'
 import ResponsiveTable from '../components/ResponsiveTable'
@@ -98,16 +99,14 @@ export default function ProjectsPage() {
   }
 
   return (
-    <AppShell maxWidth="lg">
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Typography variant={isPhone ? 'h5' : 'h4'} component="h1" sx={{ flexGrow: 1 }}>Projects</Typography>
-        {mayCreate && (
+    <AppShell>
+      <PageHeader title="Projects" subtitle="Every project you can see. Search, filter by status or team, and open one."
+        actions={mayCreate && (
           <Button variant="contained" onClick={() => setDialog({ kind: 'create' })}
             disabled={teams.status !== 'ready' || (teams.data ?? []).length === 0}>
             New project
           </Button>
-        )}
-      </Box>
+        )} />
 
       <Box role="search" aria-label="Filter projects" sx={{
         display: 'grid', gap: 2, mb: 2, alignItems: 'center',

@@ -24,6 +24,7 @@ import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
+import PageHeader from '../components/PageHeader'
 import { LoadState } from '../components/PageState'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
@@ -151,7 +152,7 @@ export default function EmployeesPage() {
   if (!allowed) {
     return (
       <AppShell>
-        <Typography variant="h4" component="h1" gutterBottom>Employees</Typography>
+        <PageHeader title="Employees" />
         <Alert severity="info">You don&apos;t have permission to view the employee list.</Alert>
       </AppShell>
     )
@@ -161,14 +162,10 @@ export default function EmployeesPage() {
   const columnCount = (isPhone ? 2 : 5) + (isAdmin ? 2 : 0)
 
   return (
-    <AppShell maxWidth="lg">
-      <Box sx={{
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2,
-      }}>
-        <Typography variant={isPhone ? 'h5' : 'h4'} component="h1" sx={{ flexGrow: 1 }}>
-          Employees
-        </Typography>
-        {isAdmin && (
+    <AppShell>
+      <PageHeader title="Employees"
+        subtitle={isAdmin ? 'Everyone at ACME. Archive people instead of deleting them.' : 'The people in the teams you lead and across ACME.'}
+        actions={isAdmin && (
           <>
             <FormControlLabel label="Show archived" control={
               <Switch checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
@@ -177,8 +174,7 @@ export default function EmployeesPage() {
               Add employee
             </Button>
           </>
-        )}
-      </Box>
+        )} />
 
       {notice && (
         <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>

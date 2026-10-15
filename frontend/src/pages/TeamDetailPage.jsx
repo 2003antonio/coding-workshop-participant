@@ -9,10 +9,10 @@ import { Link as RouterLink, useParams } from 'react-router-dom'
 import { canManageTeams, canSeeTeamBudget } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
-import { useBreakpoint } from '../hooks/useBreakpoint'
 import AppShell from '../components/AppShell'
 import BudgetPanel from '../components/BudgetPanel'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/PageHeader'
 import { LoadError, LoadState, LoadingSkeleton } from '../components/PageState'
 import ResponsiveTable from '../components/ResponsiveTable'
 import { AddMemberDialog, TeamFormDialog } from '../components/TeamDialogs'
@@ -45,7 +45,6 @@ export default function TeamDetailPage() {
   const { id } = useParams()
   const { user, role } = useAuth()
   const api = useApi()
-  const { isPhone } = useBreakpoint()
   const isAdmin = canManageTeams(role)
   const [notice, setNotice] = useState('')
   // null, { kind: 'edit' }, { kind: 'add' }, { kind: 'archive' } or { kind: 'remove', member }
@@ -93,17 +92,13 @@ export default function TeamDetailPage() {
   }
 
   return (
-    <AppShell maxWidth="lg">
+    <AppShell>
       <Link component={RouterLink} to="/teams" sx={{ display: 'inline-block', mb: 2 }}>← All teams</Link>
       <LoadState result={team} label="Loading team" skeleton="detail">
         {(data) => (
           <Stack spacing={3}>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant={isPhone ? 'h5' : 'h4'} component="h1">{data.name}</Typography>
-                <Typography color="text.secondary">Lead: {data.lead?.name ?? 'none'}</Typography>
-              </Box>
-              {isAdmin && !data.archived_at && (
+            <PageHeader title={data.name} subtitle={`Lead: ${data.lead?.name ?? 'none'}`}
+              actions={isAdmin && !data.archived_at && (
                 <>
                   <Button variant="outlined" onClick={() => setDialog({ kind: 'edit' })}
                     disabled={people.status !== 'ready'}>
@@ -117,8 +112,7 @@ export default function TeamDetailPage() {
                     Archive team
                   </Button>
                 </>
-              )}
-            </Box>
+              )} />
             {notice && <Alert severity="success" role="status" onClose={() => setNotice('')}>{notice}</Alert>}
             {data.archived_at && <Alert severity="info">This team is archived.</Alert>}
 
