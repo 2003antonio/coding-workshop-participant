@@ -24,6 +24,12 @@ export const avatarColorSx = (key) => (theme) => {
   }
 }
 
+/**
+ * sx that draws `data-initials` as CSS content: the letters show, but they are
+ * not part of the element's text, so a row's text (and a copy-paste) is just the name.
+ */
+export const initialsSx = { '&::after': { content: 'attr(data-initials)' } }
+
 /** "Ana Silva" -> "AS", "Billing v2" -> "BV", "Platform" -> "PL". */
 export function initials(name = '') {
   const words = String(name).trim().split(/\s+/).filter(Boolean)

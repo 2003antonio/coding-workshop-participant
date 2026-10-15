@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box'
-import { avatarColorSx, initials } from './vizMath'
+import { avatarColorSx, initials, initialsSx } from './vizMath'
 
 /**
  * A small rounded square with a project's initials on its own colour. It always
@@ -7,12 +7,10 @@ import { avatarColorSx, initials } from './vizMath'
  */
 export default function ProjectTile({ name, size = 28 }) {
   return (
-    <Box aria-hidden="true" data-testid="project-tile" sx={[avatarColorSx(name), {
+    <Box aria-hidden="true" data-testid="project-tile" data-initials={initials(name)} sx={[avatarColorSx(name), initialsSx, {
       width: size, height: size, borderRadius: size >= 40 ? '10px' : '7px', flexShrink: 0,
       display: 'inline-grid', placeItems: 'center', fontSize: Math.round(size * 0.4), fontWeight: 700, lineHeight: 1,
-    }]}>
-      {initials(name)}
-    </Box>
+    }]} />
   )
 }
 

@@ -22,6 +22,8 @@ import InlineEditCell from './inline/InlineEditCell'
 import { LoadState } from './PageState'
 import { DateField } from './ProjectFormDialog'
 import ResponsiveTable from './ResponsiveTable'
+import { PersonName } from './viz/Avatar'
+import HoursMeter from './viz/HoursMeter'
 
 const HOURS_HELP = 'Whole hours, 1 to 40. A person can work at most 40 hours a week in total.'
 
@@ -215,12 +217,15 @@ export default function AllocationsSection({ project, canEdit, role }) {
       <LoadState result={result} label="Loading assignments" skeleton="table">
         {(rows) => (
           <ResponsiveTable label="Assignments" rows={rows} empty="No one is assigned yet." columns={[
-            { key: 'person', label: 'Person', primary: true, render: (a) => a.employee.name },
+            { key: 'person', label: 'Person', primary: true, render: (a) => <PersonName name={a.employee.name} /> },
             { key: 'hours', label: 'Hours per week', align: 'right', render: (a) => (
-              <InlineEditCell canEdit={canEdit && !closed} value={String(a.hours_per_week)}
-                what={`hours per week of ${a.employee.name}`} inputProps={{ inputMode: 'numeric' }}
-                validate={(hours) => assignmentErrors({ ...a, hours_per_week: hours }, project).hours_per_week ?? null}
-                onSave={(hours) => saveHours(a, Number(hours))} />
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
+                <InlineEditCell canEdit={canEdit && !closed} value={String(a.hours_per_week)}
+                  what={`hours per week of ${a.employee.name}`} inputProps={{ inputMode: 'numeric' }}
+                  validate={(hours) => assignmentErrors({ ...a, hours_per_week: hours }, project).hours_per_week ?? null}
+                  onSave={(hours) => saveHours(a, Number(hours))} />
+                <HoursMeter hours={a.hours_per_week} />
+              </Box>
             ) },
             { key: 'dates', label: 'Dates', render: (a) => `${formatDate(a.start_date)} – ${formatDate(a.end_date)}` },
             { key: 'cost', label: 'Weekly cost', align: 'right', hidden: !showCost,

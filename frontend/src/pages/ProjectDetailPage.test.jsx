@@ -495,3 +495,20 @@ describe('Project detail: health strip', () => {
     expect(server.count('GET', '/api/projects/p-1/budget')).toBe(0)
   })
 })
+
+describe('Project detail: row details', () => {
+  it('deliverable rows carry a status stripe and a due chip; people rows an avatar and an hours meter', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    await deliverablesTable()
+    const frontend = rowFor('Frontend')
+    expect(frontend).toHaveAttribute('data-accent', 'overdue')
+    expect(within(frontend).getByText(/^(Due |\d+ days? overdue$)/)).toBeInTheDocument()
+
+    await openTab(user, 'People')
+    await screen.findByRole('table', { name: 'Assignments' })
+    const eve = rowFor('Eve Employee')
+    expect(within(eve).getByRole('img', { name: '20 of 40 hours a week' })).toBeInTheDocument()
+    expect(eve.querySelector('[data-initials="EE"]')).toHaveAttribute('aria-hidden', 'true')
+  })
+})

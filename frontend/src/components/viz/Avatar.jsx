@@ -1,6 +1,5 @@
-import MuiAvatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
-import { avatarColorSx, initials } from './vizMath'
+import { avatarColorSx, initials, initialsSx } from './vizMath'
 
 const ringSx = (t) => ({ boxShadow: `0 0 0 2px ${(t.vars ?? t).palette.background.paper}` })
 
@@ -12,11 +11,10 @@ const ringSx = (t) => ({ boxShadow: `0 0 0 2px ${(t.vars ?? t).palette.backgroun
 export default function Avatar({ name, size = 28, decorative = false }) {
   const a11y = decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name }
   return (
-    <MuiAvatar {...a11y} sx={[avatarColorSx(name), {
-      width: size, height: size, fontSize: Math.round(size * 0.4), fontWeight: 700, flexShrink: 0,
-    }]}>
-      {initials(name)}
-    </MuiAvatar>
+    <Box component="span" {...a11y} data-initials={initials(name)} sx={[avatarColorSx(name), initialsSx, {
+      width: size, height: size, borderRadius: '50%', display: 'inline-grid', placeItems: 'center',
+      fontSize: Math.round(size * 0.4), fontWeight: 700, lineHeight: 1, flexShrink: 0,
+    }]} />
   )
 }
 
@@ -41,15 +39,15 @@ export function AvatarStack({ names, max = 4, size = 28 }) {
     : `${names.length} ${names.length === 1 ? 'person' : 'people'}: ${names.join(', ')}`
   return (
     <Box role="img" aria-label={label} title={names.join(', ')}
-      sx={{ display: 'inline-flex', alignItems: 'center', pl: 0.75, flexShrink: 0 }}>
+      sx={{ display: 'inline-flex', alignItems: 'center', pl: 0.5, flexShrink: 0 }}>
       {shown.map((name) => (
-        <Box key={name} sx={[{ ml: -0.75, borderRadius: '50%', display: 'flex' }, ringSx]}>
+        <Box key={name} sx={[{ ml: -0.5, borderRadius: '50%', display: 'flex' }, ringSx]}>
           <Avatar name={name} size={size} decorative />
         </Box>
       ))}
       {rest > 0 && (
         <Box aria-hidden="true" sx={[{
-          ml: -0.75, width: size, height: size, borderRadius: '50%', display: 'grid', placeItems: 'center',
+          ml: -0.5, width: size, height: size, borderRadius: '50%', display: 'grid', placeItems: 'center',
           fontSize: Math.round(size * 0.38), fontWeight: 700, bgcolor: 'action.selected', color: 'text.primary',
         }, ringSx]}>
           +{rest}

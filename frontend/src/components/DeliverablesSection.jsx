@@ -7,6 +7,7 @@ import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import { useApi, useLoad } from '../auth/useApi'
 import { useProjectRefresh } from './projectRefresh'
+import DueChip from './viz/DueChip'
 import { detailsSentence, namesOf } from '../services/errorDetails'
 import * as projectService from '../services/projectService'
 import { ARCHIVE_NOTE, messageFor } from '../pages/apiMessages'
@@ -23,6 +24,14 @@ import StatusChip from './StatusChip'
  * manager and admins add deliverables, change status and edit dependencies;
  * everyone else reads.
  */
+/** The colour stripe of a deliverable's row: the most urgent thing about it. */
+const deliverableTone = (d) => {
+  if (d.status === 'done') return 'done'
+  if (d.overdue) return 'overdue'
+  if (d.blocked) return 'blocked'
+  return d.status === 'in_progress' ? 'in_progress' : 'not_started'
+}
+
 export default function DeliverablesSection({ project, canEdit }) {
   const api = useApi()
   const [notice, setNotice] = useState(null) // { severity, text }
@@ -142,7 +151,7 @@ export default function DeliverablesSection({ project, canEdit }) {
       )}
       <LoadState result={result} label="Loading deliverables" skeleton="table">
         {() => (
-          <ResponsiveTable label="Deliverables" rows={rows} empty="No deliverables yet." columns={[
+          <ResponsiveTable label="Deliverables" rows={rows} empty="No deliverables yet." accent={deliverableTone} columns={[
             { key: 'name', label: 'Deliverable', primary: true, render: (d) => (
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 <InlineEditCell canEdit={canEdit} value={d.name} what={`name of ${d.name}`}
@@ -152,10 +161,13 @@ export default function DeliverablesSection({ project, canEdit }) {
               </Box>
             ) },
             { key: 'dates', label: 'Dates', render: (d) => (
-              <InlineEditCell canEdit={canEdit} value={d.due_date} type="date" what={`due date of ${d.name}`}
-                format={(due) => `${formatDate(d.start_date)} – ${formatDate(due)}`}
-                inputProps={{ min: d.start_date, max: project.end_date }}
-                validate={checkDue(d)} onSave={(due_date) => saveInline(d, { due_date })} />
+              <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
+                <InlineEditCell canEdit={canEdit} value={d.due_date} type="date" what={`due date of ${d.name}`}
+                  format={(due) => `${formatDate(d.start_date)} – ${formatDate(due)}`}
+                  inputProps={{ min: d.start_date, max: project.end_date }}
+                  validate={checkDue(d)} onSave={(due_date) => saveInline(d, { due_date })} />
+                {d.status !== 'done' && <DueChip due={d.due_date} />}
+              </Box>
             ) },
             { key: 'status', label: 'Status', render: (d) => (canEdit ? (
               <TextField select size="small" value={d.status} disabled={saving === d.id}

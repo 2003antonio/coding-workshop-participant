@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import theme from '../../theme'
 import Avatar, { AvatarStack } from './Avatar'
 import DueChip from './DueChip'
+import HoursMeter from './HoursMeter'
 import ProjectTile from './ProjectTile'
 import Sparkline from './Sparkline'
 import StatusBar from './StatusBar'
@@ -41,7 +42,7 @@ describe('Avatar and AvatarStack', () => {
     expect(initials('Platform')).toBe('PL')
     expect(colorIndex('Ana Silva')).toBe(colorIndex('Ana Silva'))
     show(<><Avatar name="Ana Silva" /><AvatarStack names={['A One', 'B Two', 'C Three', 'D Four', 'E Five', 'F Six']} /></>)
-    expect(screen.getByRole('img', { name: 'Ana Silva' })).toHaveTextContent('AS')
+    expect(screen.getByRole('img', { name: 'Ana Silva' })).toHaveAttribute('data-initials', 'AS')
     const stack = screen.getByRole('img', { name: '6 people: A One, B Two, C Three, D Four, E Five, F Six' })
     expect(stack).toHaveTextContent('+2')
   })
@@ -62,7 +63,15 @@ describe('ProjectTile', () => {
   it('is decorative initials beside the name', () => {
     show(<ProjectTile name="Billing v2" />)
     const tile = screen.getByTestId('project-tile')
-    expect(tile).toHaveTextContent('BV')
+    expect(tile).toHaveAttribute('data-initials', 'BV')
+    expect(tile).toHaveTextContent('')
     expect(tile).toHaveAttribute('aria-hidden', 'true')
+  })
+})
+
+describe('HoursMeter', () => {
+  it('names the hours against the 40 h limit', () => {
+    show(<HoursMeter hours={24} />)
+    expect(screen.getByRole('img', { name: '24 of 40 hours a week' })).toBeInTheDocument()
   })
 })
