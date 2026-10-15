@@ -73,3 +73,21 @@ export const nearCapacityCount = ({ people, threshold }) => ({
   value: people.length,
   note: `Above ${threshold} h in a week, next 12 weeks`,
 })
+
+/**
+ * Portfolio health from reports 1, 2 and 7: each project counted once as over
+ * budget (report 7 says so), else at risk (report 2 lists it), else healthy.
+ * A project whose costs the server hid is never counted as over budget; `hidden`
+ * says how many those are, so the words can say so (never a made-up 0).
+ */
+export function portfolioHealth(statusData, riskData, budgetData) {
+  const over = new Set(budgetData.projects.filter((p) => !p.hidden_reason && p.over_budget === true).map((p) => p.id))
+  const risky = new Set(riskData.projects.map((p) => p.id))
+  const counts = { healthy: 0, at_risk: 0, over_budget: 0 }
+  for (const p of statusData.projects) {
+    if (over.has(p.id)) counts.over_budget += 1
+    else if (risky.has(p.id)) counts.at_risk += 1
+    else counts.healthy += 1
+  }
+  return { ...counts, hidden: budgetData.projects.filter((p) => p.hidden_reason).length }
+}

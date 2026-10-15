@@ -17,12 +17,17 @@ import * as allocationService from '../../services/allocationService'
 import * as reportService from '../../services/reportService'
 import EmptyState from '../EmptyState'
 import { LoadState } from '../PageState'
-import { MAX_HOURS } from '../mywork/weekMath'
+import { MAX_HOURS, weeksFromAllocations } from '../mywork/weekMath'
+import ProjectTile from '../viz/ProjectTile'
+import Sparkline from '../viz/Sparkline'
 import {
-  dueText, hoursThisWeek, localToday, myProjects, nextDeadline, overdueOrSoon, workloadSummary,
+  dueText, hoursThisWeek, localToday, myProjects, nextDeadline, overdueOrSoon, weeksFrom, workloadSummary,
 } from './homeMath'
 
 const projectPath = (id) => `/projects/${encodeURIComponent(id)}`
+
+/** How many weeks ahead the sparkline beside the summary looks. */
+const SPARK_WEEKS = 8
 
 /** A titled card; with `to`, the whole card is one link (named by its title) with a focus ring. */
 function HomeCard({ id, title, icon: Icon, to, children }) {
@@ -68,7 +73,13 @@ function Cards({ allocations, deliverables }) {
   const summary = workloadSummary(allocations, today)
   return (
     <>
-      {summary && <Typography sx={{ mb: 2 }}>{summary}</Typography>}
+      {summary && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+          <Typography>{summary}</Typography>
+          <Sparkline values={weeksFromAllocations(weeksFrom(today, SPARK_WEEKS), allocations).map((w) => w.total_hours)}
+            what={`Your hours per week, next ${SPARK_WEEKS} weeks`} unit=" h" limit={MAX_HOURS} />
+        </Box>
+      )}
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' } }}>
         <HomeCard id="card-week" title="This week" icon={ScheduleOutlined} to="/my-work">
           <Typography component="p" variant="h4" sx={{ fontWeight: 700 }}>{hours} of {MAX_HOURS} h</Typography>
@@ -104,7 +115,8 @@ function Cards({ allocations, deliverables }) {
         <HomeCard id="card-projects" title="My projects" icon={FolderOutlined}>
           <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 1 }}>
             {projects.map((p) => (
-              <Box component="li" key={p.id} sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+              <Box component="li" key={p.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ProjectTile name={p.name} size={28} />
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600 }} noWrap>{p.name}</Typography>
                   <Typography variant="body2" color="text.secondary">Until {formatDate(p.end)}</Typography>

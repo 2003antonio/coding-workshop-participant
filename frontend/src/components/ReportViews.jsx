@@ -5,7 +5,6 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import FormControlLabel from '@mui/material/FormControlLabel'
-import LinearProgress from '@mui/material/LinearProgress'
 import Link from '@mui/material/Link'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
@@ -29,6 +28,10 @@ import { shiftWeek } from './heatmap/heatScale'
 import { Empty, LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
+import { PersonName } from './viz/Avatar'
+import HoursMeter from './viz/HoursMeter'
+import { ProjectName } from './viz/ProjectTile'
+import StatusBar from './viz/StatusBar'
 
 const projectLink = (p) => <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`}>{p.name}</Link>
 const money = (amount) => (amount === null || amount === undefined ? '—' : formatMoney(amount))
@@ -45,16 +48,25 @@ export function ProjectStatusReport() {
       {(data) => (
         <ResponsiveTable label="Project status" rows={data.projects} empty="No projects to report on."
           columns={[
-            { key: 'name', label: 'Project', primary: true, render: projectLink },
+            { key: 'name', label: 'Project', primary: true, render: (p) => <ProjectName name={p.name}>{projectLink(p)}</ProjectName> },
             { key: 'team', label: 'Team', render: (p) => p.team?.name },
             { key: 'status', label: 'Status', render: (p) => <StatusChip status={p.status} /> },
-            { key: 'progress', label: 'Complete', render: (p) => (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 120 }}>
-                <LinearProgress variant="determinate" value={p.percent_complete} sx={{ flexGrow: 1 }}
-                  aria-label={`${p.name} complete`} />
-                <span>{Math.round(p.percent_complete)}%</span>
-              </Box>
-            ) },
+            { key: 'progress', label: 'Complete', render: (p) => {
+              const d = p.deliverables
+              return (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 140 }}>
+                  <Box role="img" sx={{ flexGrow: 1 }} aria-label={`${p.name}: ${d.done} done, `
+                    + `${d.in_progress} in progress, ${d.not_started} not started`}>
+                    <StatusBar legend={false} height={8} segments={[
+                      { key: 'done', label: 'Done', count: d.done, tone: 'done' },
+                      { key: 'in_progress', label: 'In progress', count: d.in_progress, tone: 'in_progress' },
+                      { key: 'not_started', label: 'Not started', count: d.not_started, tone: 'not_started' },
+                    ]} />
+                  </Box>
+                  <span>{Math.round(p.percent_complete)}%</span>
+                </Box>
+              )
+            } },
             { key: 'done', label: 'Done', align: 'right', render: (p) => `${p.deliverables.done} of ${p.deliverables.total}` },
             { key: 'overdue', label: 'Overdue', align: 'right', render: (p) => p.deliverables.overdue },
             { key: 'blocked', label: 'Blocked', align: 'right', render: (p) => p.deliverables.blocked },
@@ -196,9 +208,16 @@ export function CapacityReport() {
           <ResponsiveTable label="Near capacity" rows={data.people}
             empty={`No one is above ${data.threshold} hours in any week.`}
             columns={[
-              { key: 'name', label: 'Person', primary: true, render: (p) => p.name },
+              { key: 'name', label: 'Person', primary: true, render: (p) => <PersonName name={p.name} /> },
               { key: 'weeks', label: `Weeks above ${data.threshold} h`, render: (p) => (
-                p.weeks.map((w) => `${formatWeekShort(w.week_start)}: ${w.total_hours} h`).join(', ')
+                <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 0.5 }}>
+                  {p.weeks.map((w) => (
+                    <Box component="li" key={w.week_start} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box component="span" sx={{ minWidth: 110 }}>{formatWeekShort(w.week_start)}: {w.total_hours} h</Box>
+                      <HoursMeter hours={w.total_hours} width={140} decorative />
+                    </Box>
+                  ))}
+                </Box>
               ) },
             ]} />
         )}

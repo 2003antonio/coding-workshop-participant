@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { barScale, budgetState, overBudgetCount } from '../components/dashboard/dashboardMath'
+import { barScale, budgetState, overBudgetCount, portfolioHealth } from '../components/dashboard/dashboardMath'
 import { localToday, nextDeadline, overdueOrSoon, workloadSummary } from '../components/home/homeMath'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { renderApp } from '../test/renderApp'
@@ -343,5 +343,38 @@ describe('dashboard rules', () => {
     expect(overBudgetCount({ projects: [row({ hidden_reason: 'below_min_group' })] }).value).toBe('Hidden')
     expect(overBudgetCount({ projects: [row({ over_budget: true }), row({ id: 'q', hidden_reason: 'below_min_group' })] }))
       .toEqual({ value: 1, note: '1 more hidden: fewer than 3 people' })
+  })
+})
+
+describe('Home: portfolio health and the employee sparkline', () => {
+  it('admin sees one bar of healthy / at risk / over budget, said in words', async () => {
+    signedInAs('admin')
+    renderApp('/')
+    const health = await screen.findByRole('region', { name: 'Portfolio health' })
+    const legend = await within(health).findByRole('list', { name: 'Projects by health' })
+    expect(within(legend).getByText('At risk')).toBeInTheDocument()
+    expect(within(health).getByText(/^\d+ of \d+ projects? healthy\.$/)).toBeInTheDocument()
+  })
+
+  it('counts each project once; hidden budgets are never counted as over', () => {
+    const ids = (...list) => list.map((id) => ({ id }))
+    expect(portfolioHealth(
+      { projects: ids('a', 'b', 'c', 'd') },
+      { projects: ids('b', 'c') },
+      { projects: [{ id: 'c', over_budget: true }, { id: 'd', over_budget: null, hidden_reason: 'below_min_group' }] },
+    )).toEqual({ healthy: 2, at_risk: 1, over_budget: 1, hidden: 1 })
+  })
+
+  it('an employee sees a sparkline of their coming weeks beside the summary', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 10, 9, 0))
+    try {
+      signedInAs('employee')
+      renderApp('/')
+      expect(await screen.findByRole('img', { name: /^Your hours per week, next 8 weeks: from 20 h to / }))
+        .toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
