@@ -262,8 +262,10 @@ describe('Team archive', () => {
     expect(screen.queryByRole('button', { name: 'Archive team' })).not.toBeInTheDocument()
   })
 
-  it('a team with open projects is refused with a fixed sentence', async () => {
-    signedInAs('admin')
+  it('a team with open projects is refused with a fixed sentence when its projects cannot be listed', async () => {
+    signedInAs('admin', { // the team page itself does not list projects; only the look-up after the refusal fails
+      routes: { 'GET /api/projects/': () => reply(500, { error: { code: 'x', message: 'Server text' } }) },
+    })
     const { user } = renderApp('/teams/t-1')
     await user.click(await screen.findByRole('button', { name: 'Archive team' }))
     const dialog = await screen.findByRole('dialog', { name: 'Archive Platform?' })
@@ -277,5 +279,21 @@ describe('Team archive', () => {
     renderApp('/teams/t-1')
     await screen.findByRole('heading', { name: 'Platform' })
     expect(screen.queryByRole('button', { name: 'Archive team' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Team archive refused', () => {
+  it('names the active projects as links and how many members would leave', async () => {
+    const server = signedInAs('admin')
+    const { user } = renderApp('/teams/t-2')
+    await user.click(await screen.findByRole('button', { name: 'Archive team' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Archive Data?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
+    const alert = await within(dialog).findByText(/can.t be archived while it has 1 active project/)
+    expect(alert.closest('[role="alert"]')).toHaveTextContent(
+      "Data can't be archived while it has 1 active project: Data Lake. Archive it or move it to another team first. "
+      + 'Its 1 member will leave the team when it is archived.')
+    expect(within(dialog).getByRole('link', { name: 'Data Lake' })).toHaveAttribute('href', '/projects/p-2')
+    expect(server.db.teams.find((t) => t.id === 't-2').archived_at).toBeNull()
   })
 })

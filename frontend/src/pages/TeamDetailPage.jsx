@@ -21,6 +21,7 @@ import { AddMemberDialog, TeamFormDialog } from '../components/TeamDialogs'
 import { useToast } from '../components/toast/toast'
 import * as budgetService from '../services/budgetService'
 import * as employeeService from '../services/employeeService'
+import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { ARCHIVE_NOTE } from './apiMessages'
 import { ROLE_LABELS } from './format'
@@ -90,8 +91,34 @@ export default function TeamDetailPage() {
   }
 
   async function handleArchive() {
-    const archived = await api((token) => teamService.archiveTeam(token, id))
-    finish(`Team archived: ${archived.name}`)
+    try {
+      const archived = await api((token) => teamService.archiveTeam(token, id))
+      finish(`Team archived: ${archived.name}`)
+    } catch (error) {
+      if (error?.code === 'has_active_projects') error.sentence = await blockers()
+      throw error
+    }
+  }
+
+  /** Why the archive was refused: the team's active projects (as links) and who would leave it. */
+  async function blockers() {
+    const projects = await api((token) => projectService.listProjects(token, { teamId: id })).catch(() => null)
+    if (!projects?.length) return undefined // the fixed message for the code is shown instead
+    const members = team.data?.member_count ?? 0
+    return (
+      <>
+        {team.data?.name} can&apos;t be archived while it has {projects.length} active
+        {projects.length === 1 ? ' project' : ' projects'}:{' '}
+        {projects.map((p, i) => (
+          <span key={p.id}>
+            {i > 0 && ', '}
+            <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`}>{p.name}</Link>
+          </span>
+        ))}
+        . {projects.length === 1 ? 'Archive it or move it' : 'Archive them or move them'} to another team first.
+        {members > 0 && ` Its ${members} ${members === 1 ? 'member' : 'members'} will leave the team when it is archived.`}
+      </>
+    )
   }
 
   return (
