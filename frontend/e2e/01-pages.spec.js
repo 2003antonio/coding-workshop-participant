@@ -18,6 +18,7 @@ const PLAN = {
   hal: {},
 }
 
+const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 let salaries = []
 test.beforeAll(async ({ request }) => {
   salaries = await demoSalaries(request)
@@ -79,6 +80,20 @@ for (const [key, account] of Object.entries(ACCOUNTS)) {
       await openFromMenu(page, 'Employees')
       await expect(page.getByRole('columnheader', { name: 'Salary' })).toHaveCount(account.role === 'admin' ? 1 : 0)
       await visit('employees')
+      if (account.role === 'admin') {
+        // Salaries are masked until asked for (a shoulder-surfing guard): none in the page,
+        // then the eye button shows exactly that person's salary.
+        const table = page.getByRole('table', { name: 'Employees' })
+        const shown = async () => {
+          const text = await table.innerText()
+          return salaries.filter((s) => text.includes(money.format(s)))
+        }
+        expect(await shown(), 'a salary is visible before reveal').toHaveLength(0)
+        await page.getByRole('button', { name: 'Show salary for Ana Silva' }).click()
+        await expect(page.getByRole('button', { name: 'Hide salary for Ana Silva' })).toBeVisible()
+        expect(await shown(), 'exactly one salary after reveal').toHaveLength(1)
+        await snap(page, key, `${String(shot + 1).padStart(2, '0')}-employees-salary-revealed`)
+      }
     }
   })
 }

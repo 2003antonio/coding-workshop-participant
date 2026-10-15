@@ -8,8 +8,11 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
 import { useMediaQuery } from 'react-responsive'
 import { messageFor } from '../pages/employeeMessages'
+import { RevealButton } from './MaskedMoney'
+import { MASK, useReveal } from './reveal'
 
 // Same limits as backend/employees/routes.py, so most mistakes are caught
 // before a request is sent. The server still checks everything.
@@ -35,7 +38,7 @@ function initialValues(employee) {
   }
 }
 
-function validate(values, isCreate) {
+function validate(values, isCreate, checkSalary = true) {
   const errors = {}
   const text = (field, label) => {
     const value = values[field].trim()
@@ -48,7 +51,9 @@ function validate(values, isCreate) {
 
   const salary = values.salary.trim()
   const amount = Number(salary)
-  if (salary === '' || !Number.isFinite(amount)) errors.salary = 'Enter a salary as a number.'
+  if (!checkSalary) {
+    // Editing without touching the salary: it is not sent, so there is nothing to check.
+  } else if (salary === '' || !Number.isFinite(amount)) errors.salary = 'Enter a salary as a number.'
   else if (amount < 0 || amount > MAX_SALARY) errors.salary = 'Enter a salary from 0 to 9,999,999,999.99.'
   else if (!/^\d+(\.\d{1,2})?$/.test(salary)) errors.salary = 'Use at most two decimal places.'
 
@@ -62,7 +67,8 @@ function validate(values, isCreate) {
  * Create or edit one employee. onSubmit(payload, teamId) must return a promise;
  * if it rejects, the dialog stays open and shows a friendly message.
  *   create payload: { name, email, job_title, role, salary, password }
- *   edit payload:   { name, job_title, role, salary }
+ *   edit payload:   { name, job_title, role, salary? } (salary only when it was changed;
+ *                   it stays masked until the admin clicks "Show salary for <name>")
  *   teamId: the chosen team, or null for none. Team membership is not part of
  *   the employee record: the caller changes it through /api/teams/{id}/members.
  * `teams` are the active teams to offer; null if they could not be loaded.
@@ -74,6 +80,8 @@ export default function EmployeeFormDialog({ employee, teams = null, onClose, on
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [salaryShown, setSalaryShown] = useReveal()
+  const salaryChanged = isCreate || values.salary !== initialValues(employee).salary
 
   const titleId = 'employee-form-title'
   const field = (name) => ({
@@ -87,7 +95,7 @@ export default function EmployeeFormDialog({ employee, teams = null, onClose, on
 
   async function handleSubmit(event) {
     event.preventDefault()
-    const found = validate(values, isCreate)
+    const found = validate(values, isCreate, salaryChanged)
     setErrors(found)
     if (Object.keys(found).length > 0) return
 
@@ -95,8 +103,8 @@ export default function EmployeeFormDialog({ employee, teams = null, onClose, on
       name: values.name.trim(),
       job_title: values.job_title.trim(),
       role: values.role,
-      salary: Number(values.salary),
     }
+    if (salaryChanged) payload.salary = Number(values.salary)
     if (isCreate) {
       payload.email = values.email.trim()
       payload.password = values.password
@@ -135,8 +143,23 @@ export default function EmployeeFormDialog({ employee, teams = null, onClose, on
               .filter((team) => !employee || team.lead?.id !== employee.id)
               .map((team) => <MenuItem key={team.id} value={team.id}>{team.name}</MenuItem>)}
           </TextField>
-          <TextField label="Salary" required {...field('salary')}
-            slotProps={{ htmlInput: { inputMode: 'decimal' } }} />
+          {isCreate || salaryShown ? (
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <TextField label="Salary" required {...field('salary')}
+                slotProps={{ htmlInput: { inputMode: 'decimal' } }} />
+              {!isCreate && (
+                <Box sx={{ pt: 1.5 }}>
+                  <RevealButton shown onToggle={() => setSalaryShown(false)} what="salary" name={employee.name} />
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 56, mb: 2.5 }}>
+              <Typography color="text.secondary">Salary</Typography>
+              <Typography aria-label="salary hidden" sx={{ letterSpacing: 1 }}>{MASK}</Typography>
+              <RevealButton shown={false} onToggle={() => setSalaryShown(true)} what="salary" name={employee.name} />
+            </Box>
+          )}
           {isCreate && (
             <TextField label="Initial password" type="password" autoComplete="new-password"
               required {...field('password')} />

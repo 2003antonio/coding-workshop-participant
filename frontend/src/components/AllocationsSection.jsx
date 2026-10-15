@@ -11,6 +11,8 @@ import * as allocationService from '../services/allocationService'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { formatDate, formatMoney } from '../pages/format'
+import { Masked, RevealButton } from './MaskedMoney'
+import { useRevealSet } from './reveal'
 import { messageFor } from '../pages/apiMessages'
 import { detailsSentence } from '../services/errorDetails'
 import ConfirmDialog from './ConfirmDialog'
@@ -121,6 +123,7 @@ function EditAssignmentDialog({ project, allocation, onClose, onSubmit }) {
 export default function AllocationsSection({ project, canEdit, role }) {
   const api = useApi()
   const showCost = canSeeSalaries(role)
+  const reveal = useRevealSet() // per person, masked until the admin clicks the eye
   const [notice, setNotice] = useState('')
   const [problem, setProblem] = useState('') // why an in-place change was undone
   const [dialog, setDialog] = useState(null) // null, { kind: 'assign' } or { kind: 'edit' | 'remove', allocation }
@@ -214,7 +217,13 @@ export default function AllocationsSection({ project, canEdit, role }) {
             ) },
             { key: 'dates', label: 'Dates', render: (a) => `${formatDate(a.start_date)} – ${formatDate(a.end_date)}` },
             { key: 'cost', label: 'Weekly cost', align: 'right', hidden: !showCost,
-              render: (a) => (a.weekly_cost === undefined ? '—' : formatMoney(a.weekly_cost)) },
+              render: (a) => (a.weekly_cost === undefined ? '—' : (
+                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, whiteSpace: 'nowrap' }}>
+                  <Masked shown={reveal.isShown(a.id)} what="weekly cost">{formatMoney(a.weekly_cost)}</Masked>
+                  <RevealButton shown={reveal.isShown(a.id)} onToggle={() => reveal.toggle(a.id)}
+                    what="weekly cost" name={a.employee.name} />
+                </Box>
+              )) },
             { key: 'actions', label: 'Actions', align: 'right', hidden: !canEdit || closed, render: (a) => (
               <Box component="span" sx={{ display: 'inline-flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end' }}>
                 <Button size="small" aria-label={`Edit assignment of ${a.employee.name}`} sx={{ minHeight: 44 }}

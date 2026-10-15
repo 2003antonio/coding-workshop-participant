@@ -156,7 +156,10 @@ describe('Project detail: people', () => {
     await openTab(user, 'People')
     await screen.findByRole('table', { name: 'Assignments' })
     expect(headersOf('Assignments')).toEqual(['Person', 'Hours per week', 'Dates', 'Weekly cost', 'Actions'])
-    expect(within(rowFor('Eve Employee')).getByText('$865.39')).toBeInTheDocument() // 20 h × 90,000.50 / 2080
+    // Masked until the admin asks: 20 h × 90,000.50 / 2080.
+    expect(within(rowFor('Eve Employee')).queryByText(/865\.39/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show weekly cost for Eve Employee' }))
+    expect(within(rowFor('Eve Employee')).getByText('$865.39')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Assign person' }))
     const dialog = await screen.findByRole('dialog', { name: 'Assign someone to Billing v2' })
@@ -238,6 +241,8 @@ describe('Project detail: budget', () => {
     expect(within(panel).getByText('Within budget')).toBeInTheDocument()
     expect(headersOf('Cost per assignment'))
       .toEqual(['Person', 'Hours per week', 'Weeks', 'Hourly rate', 'Committed', 'Used to date'])
+    expect(within(rowFor('Bo Builder')).queryByText(/40\.00/)).not.toBeInTheDocument() // masked until asked
+    await user.click(screen.getByRole('button', { name: 'Show hourly rate for Bo Builder' }))
     expect(within(rowFor('Bo Builder')).getByText('$40.00')).toBeInTheDocument()
   })
 

@@ -24,6 +24,7 @@ import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
+import MaskedMoney from '../components/MaskedMoney'
 import PageHeader from '../components/PageHeader'
 import { LoadState } from '../components/PageState'
 import * as employeeService from '../services/employeeService'
@@ -73,7 +74,8 @@ function ArchiveDialog({ employee, onClose, onConfirm }) {
 
 /**
  * The employee list. Admins and managers can open it; only admins see salaries
- * and the Add / Edit / Archive buttons. The server enforces the same rules.
+ * (masked until they click the eye, components/MaskedMoney.jsx) and the Add /
+ * Edit / Archive buttons. The server enforces the same rules.
  */
 export default function EmployeesPage() {
   const { user, role } = useAuth()
@@ -231,7 +233,11 @@ export default function EmployeesPage() {
                     {!isPhone && <TableCell>{employee.job_title}</TableCell>}
                     {!isPhone && <TableCell>{teamName(employee.team_id, teams ?? [])}</TableCell>}
                     <TableCell>{ROLE_LABELS[employee.role] ?? employee.role}</TableCell>
-                    {isAdmin && <TableCell align="right">{money.format(employee.salary)}</TableCell>}
+                    {isAdmin && (
+                      <TableCell align="right">
+                        <MaskedMoney amount={employee.salary} format={money.format} what="salary" name={employee.name} />
+                      </TableCell>
+                    )}
                     {isAdmin && (
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                         {!archived && (

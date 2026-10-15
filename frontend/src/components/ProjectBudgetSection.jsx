@@ -10,6 +10,8 @@ import { formatMoney, formatPercent } from '../pages/format'
 import BudgetBar from './BudgetBar'
 import BudgetFlag from './BudgetFlag'
 import BudgetPanel from './BudgetPanel'
+import { Masked, RevealButton } from './MaskedMoney'
+import { useRevealSet } from './reveal'
 import { LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 
@@ -57,6 +59,7 @@ export default function ProjectBudgetSection({ project, role }) {
   )
   const result = useLoad(load)
   const showLines = canSeeSalaries(role)
+  const reveal = useRevealSet() // per person, masked until the admin clicks the eye
 
   return (
     <LoadState result={result} label="Loading budget" skeleton="cards">
@@ -82,9 +85,19 @@ export default function ProjectBudgetSection({ project, role }) {
                     { key: 'person', label: 'Person', primary: true, render: (l) => l.employee.name },
                     { key: 'hours', label: 'Hours per week', align: 'right', render: (l) => l.hours_per_week },
                     { key: 'weeks', label: 'Weeks', align: 'right', render: (l) => l.weeks },
-                    { key: 'rate', label: 'Hourly rate', align: 'right', render: (l) => formatMoney(l.hourly_rate) },
-                    { key: 'committed', label: 'Committed', align: 'right', render: (l) => formatMoney(l.committed_cost) },
-                    { key: 'used', label: 'Used to date', align: 'right', render: (l) => formatMoney(l.used_cost_to_date) },
+                    { key: 'rate', label: 'Hourly rate', align: 'right', render: (l) => (
+                      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, whiteSpace: 'nowrap' }}>
+                        <Masked shown={reveal.isShown(l.allocation_id)} what="hourly rate">{formatMoney(l.hourly_rate)}</Masked>
+                        <RevealButton shown={reveal.isShown(l.allocation_id)} onToggle={() => reveal.toggle(l.allocation_id)}
+                          what="hourly rate" name={l.employee.name} />
+                      </Box>
+                    ) },
+                    { key: 'committed', label: 'Committed', align: 'right', render: (l) => (
+                      <Masked shown={reveal.isShown(l.allocation_id)} what="cost">{formatMoney(l.committed_cost)}</Masked>
+                    ) },
+                    { key: 'used', label: 'Used to date', align: 'right', render: (l) => (
+                      <Masked shown={reveal.isShown(l.allocation_id)} what="cost">{formatMoney(l.used_cost_to_date)}</Masked>
+                    ) },
                   ]} />
               </Box>
             )}
