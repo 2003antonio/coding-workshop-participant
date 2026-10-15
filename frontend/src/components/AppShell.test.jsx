@@ -82,7 +82,7 @@ describe('AppShell: collapsible sidebar', () => {
     // Collapsed, every link still has its accessible name (the text is only hidden visually).
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(within(nav).getAllByRole('link').map((a) => a.textContent))
-      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Employees'])
+      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Activity', 'Employees'])
     expect(within(nav).getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar').parentElement).toHaveStyle({ width: `${RAIL_WIDTH}px` })
 

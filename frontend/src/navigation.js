@@ -7,9 +7,10 @@ import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined'
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined'
 import FolderOutlined from '@mui/icons-material/FolderOutlined'
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined'
+import HistoryOutlined from '@mui/icons-material/HistoryOutlined'
 import HomeOutlined from '@mui/icons-material/HomeOutlined'
 import WorkOutlined from '@mui/icons-material/WorkOutlined'
-import { EMPLOYEE_LIST_ROLES } from './auth/roles'
+import { EMPLOYEE_LIST_ROLES, canSeeActivity } from './auth/roles'
 
 export const NAV_ITEMS = [
   { to: '/', label: 'Home', icon: HomeOutlined, end: true },
@@ -17,6 +18,7 @@ export const NAV_ITEMS = [
   { to: '/projects', label: 'Projects', icon: FolderOutlined },
   { to: '/teams', label: 'Teams', icon: GroupsOutlined },
   { to: '/reports', label: 'Reports', icon: AssessmentOutlined },
+  { to: '/activity', label: 'Activity', icon: HistoryOutlined, visible: canSeeActivity },
   { to: '/employees', label: 'Employees', icon: BadgeOutlined, visible: (role) => EMPLOYEE_LIST_ROLES.includes(role) },
 ]
 

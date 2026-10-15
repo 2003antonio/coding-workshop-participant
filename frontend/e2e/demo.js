@@ -46,8 +46,8 @@ export const emailOf = (key) => `${key}@acme-demo.test`
 
 /** The main menu each role should see (components/AppShell.jsx). */
 export const MENU = {
-  admin: ['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Employees'],
-  manager: ['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Employees'],
+  admin: ['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Activity', 'Employees'],
+  manager: ['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Activity', 'Employees'],
   employee: ['Home', 'My work', 'Projects', 'Teams', 'Reports'],
 }
 

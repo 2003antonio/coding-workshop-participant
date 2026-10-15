@@ -25,6 +25,7 @@ export const PUBLIC_ROUTES = [
 /** Need a session (ProtectedRoute); each page checks its own role rules. */
 export const PROTECTED_ROUTES = [
   { path: '/', Page: lazyPage(() => import('./pages/HomePage')) },
+  { path: '/activity', Page: lazyPage(() => import('./pages/ActivityPage')) },
   { path: '/employees', Page: lazyPage(() => import('./pages/EmployeesPage')) },
   { path: '/my-work', Page: lazyPage(() => import('./pages/MyWorkPage')) },
   { path: '/projects', Page: lazyPage(() => import('./pages/ProjectsPage')) },
