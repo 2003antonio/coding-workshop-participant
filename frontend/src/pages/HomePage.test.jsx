@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { barScale, budgetState, overBudgetCount } from '../components/dashboard/dashboardMath'
+import { localToday, nextDeadline, overdueOrSoon, workloadSummary } from '../components/home/homeMath'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { renderApp } from '../test/renderApp'
 
@@ -172,14 +173,139 @@ describe('Home: manager team dashboard', () => {
   })
 })
 
+describe('Home: card links', () => {
+  it('every number card is one link to the page with the detail, and at-risk rows say "View project"', async () => {
+    signedInAs('admin')
+    renderApp('/')
+    const linkIn = async (name) => {
+      await cardValue(name)
+      return within(region(name)).getByRole('link', { name })
+    }
+    expect(await linkIn('Active projects')).toHaveAttribute('href', '/projects?status=active')
+    expect(await linkIn('At risk')).toHaveAttribute('href', '/reports?tab=at-risk')
+    expect(await linkIn('Overdue deliverables')).toHaveAttribute('href', '/reports?tab=deliverables')
+    expect(await linkIn('Over budget')).toHaveAttribute('href', '/reports?tab=budget')
+    expect(await linkIn('Near capacity')).toHaveAttribute('href', '/reports?tab=near-capacity')
+    const list = await screen.findByRole('list', { name: 'At-risk projects' })
+    expect(within(list).getByRole('link', { name: 'View project Billing v2' })).toHaveAttribute('href', '/projects/p-1')
+  })
+
+  it('a manager card opens Reports on the right tab', async () => {
+    signedInAs('manager')
+    const { user } = renderApp('/')
+    await cardValue('Near capacity')
+    await user.click(within(region('Near capacity')).getByRole('link', { name: 'Near capacity' }))
+    expect(await screen.findByRole('tab', { name: 'Near capacity', selected: true })).toBeInTheDocument()
+  })
+
+  it('"Active projects" opens Projects with the Active filter already chosen', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/')
+    await cardValue('Active projects')
+    await user.click(within(region('Active projects')).getByRole('link', { name: 'Active projects' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Projects' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent('Active')
+  })
+})
+
+describe('query params from the Home cards', () => {
+  it('unknown or not-allowed values fall back to the defaults', async () => {
+    signedInAs('employee')
+    const { unmount } = renderApp('/reports?tab=budget') // an employee has no Budget report
+    expect(await screen.findByRole('tab', { name: 'Project status', selected: true })).toBeInTheDocument()
+    unmount()
+    renderApp('/reports?tab=nonsense')
+    expect(await screen.findByRole('tab', { name: 'Project status', selected: true })).toBeInTheDocument()
+  })
+
+  it('Projects ignores an unknown ?status=', async () => {
+    const server = signedInAs('admin')
+    renderApp('/projects?status=toString')
+    expect(await screen.findByRole('link', { name: 'Billing v2' })).toBeInTheDocument()
+    const lists = server.calls.filter((c) => c.method === 'GET' && c.path === '/api/projects/')
+    expect(lists.length).toBeGreaterThan(0)
+    lists.forEach((c) => expect(new URLSearchParams(c.query).has('status')).toBe(false))
+  })
+})
+
 describe('Home: employee', () => {
-  it('shows the welcome heading and asks for no manager reports', async () => {
+  // The fake server's today is Tuesday 2026-11-10; Home reads the computer's date for "due soon".
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 10, 9, 0))
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('says the coming weeks in one line and shows cards that lead somewhere, not the My work chart', async () => {
     const server = signedInAs('employee')
     renderApp('/')
     expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Eve Employee' })).toBeInTheDocument()
+    // Eve: 20 h on Billing v2, plus 16 h on Data Lake in the week of Nov 16.
+    expect(await screen.findByText('20 h per week through the week of Nov 9 ’26, then 36 h.')).toBeInTheDocument()
+    expect(within(region('This week')).getByText('20 of 40 h')).toBeInTheDocument()
+    expect(within(region('This week')).getByRole('link', { name: 'This week' })).toHaveAttribute('href', '/my-work')
+    const deadline = region('Next deadline')
+    expect(within(deadline).getByText('Backend')).toBeInTheDocument()
+    expect(within(deadline).getByText('Billing v2 · Due Dec 4, 2026')).toBeInTheDocument()
+    expect(within(deadline).getByRole('link', { name: 'Next deadline' })).toHaveAttribute('href', '/projects/p-1')
+    const urgent = region('Overdue or due soon')
+    expect(within(urgent).getByRole('link', { name: 'Frontend' })).toHaveAttribute('href', '/projects/p-1')
+    expect(within(urgent).getByText('Billing v2 · Overdue since Nov 9, 2026')).toBeInTheDocument()
+    const mine = region('My projects')
+    expect(within(mine).getByRole('link', { name: 'View Billing v2' })).toHaveAttribute('href', '/projects/p-1')
+    expect(within(mine).getByRole('link', { name: 'View Data Lake' })).toHaveAttribute('href', '/projects/p-2')
+    // Not the My work page again, and no manager reports.
+    expect(screen.queryByRole('region', { name: 'Hours per week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Assignments' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'At a glance' })).not.toBeInTheDocument()
     expect(server.count('GET', '/api/reports/at-risk-projects')).toBe(0)
     expect(server.count('GET', '/api/reports/budget')).toBe(0)
+  })
+
+  it('hides "Overdue or due soon" when nothing is', async () => {
+    signedInAs('employee', {
+      routes: { 'GET /api/reports/deliverable-status': () => reply(200, { deliverables: [] }) },
+    })
+    renderApp('/')
+    expect(await screen.findByRole('region', { name: 'My projects' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Overdue or due soon' })).not.toBeInTheDocument()
+    expect(within(region('Next deadline')).getByText('Nothing due on your projects.')).toBeInTheDocument()
+  })
+
+  it('someone with no assignments gets an empty state with a next step', async () => {
+    signedInAs('u-8') // Nia New: no team, no allocations
+    renderApp('/')
+    expect(await screen.findByText('You are not assigned to any project yet')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open My work' })).toHaveAttribute('href', '/my-work')
+    expect(screen.queryByRole('region', { name: 'This week' })).not.toBeInTheDocument()
+  })
+})
+
+describe('homeMath', () => {
+  const p1 = { id: 'p-1', name: 'Billing v2' }
+  const alloc = (hours, start, end, project = p1) => ({ project, hours_per_week: hours, start_date: start, end_date: end, archived_at: null })
+
+  it('localToday uses the local calendar day, not UTC', () => {
+    expect(localToday(new Date(2026, 9, 14, 23, 30))).toBe('2026-10-14')
+    expect(localToday(new Date(2026, 0, 1, 0, 5))).toBe('2026-01-01')
+  })
+
+  it('workloadSummary: steady, then free; free now, busy later; nothing booked', () => {
+    expect(workloadSummary([alloc(20, '2026-11-02', '2026-12-11')], '2026-11-10'))
+      .toBe('20 h per week through the week of Dec 7 ’26, then free.')
+    expect(workloadSummary([alloc(10, '2026-12-01', '2026-12-31')], '2026-11-10'))
+      .toBe('Free this week. 10 h per week from the week of Nov 30 ’26.')
+    expect(workloadSummary([alloc(8, '2026-01-01', '2027-12-31')], '2026-11-10'))
+      .toBe('8 h per week for the next 26 weeks.')
+    expect(workloadSummary([], '2026-11-10')).toBeNull()
+  })
+
+  it('nextDeadline and overdueOrSoon skip done work and sort by due date', () => {
+    const d = (id, due, status = 'not_started', overdue = false) => ({ id, due_date: due, status, overdue })
+    const list = [d('late', '2026-11-01', 'in_progress', true), d('soon', '2026-11-15'), d('later', '2026-12-20'), d('done', '2026-11-11', 'done')]
+    expect(nextDeadline(list, '2026-11-10').id).toBe('soon')
+    expect(overdueOrSoon(list, '2026-11-10').map((x) => x.id)).toEqual(['late', 'soon'])
+    expect(nextDeadline([], '2026-11-10')).toBeNull()
   })
 })
 

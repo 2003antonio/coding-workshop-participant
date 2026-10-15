@@ -13,7 +13,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import ClearOutlined from '@mui/icons-material/ClearOutlined'
 import { useMediaQuery } from 'react-responsive'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateProjects, canManageProject } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
@@ -44,7 +44,12 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('') // what is in the box
   const [query, setQuery] = useState('') // what was last sent as q (trimmed)
   const searchBox = useRef(null)
-  const [status, setStatus] = useState('')
+  const [params] = useSearchParams()
+  // ?status=active (from a Home card) picks the filter on first load; anything unknown means all.
+  const [status, setStatus] = useState(() => {
+    const asked = params.get('status') ?? ''
+    return Object.hasOwn(PROJECT_STATUS, asked) ? asked : ''
+  })
   const [teamId, setTeamId] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [notice, setNotice] = useState('')

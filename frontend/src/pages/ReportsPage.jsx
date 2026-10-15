@@ -21,12 +21,23 @@ const REPORTS = {
   budget: { label: 'Budget', View: BudgetReport },
 }
 
-/** All reports the caller's role may open, one per tab (?report=<key> keeps the choice in the URL). */
+/** Readable names for ?tab= (Home's cards link to /reports?tab=at-risk and so on). */
+const TAB_SLUGS = {
+  'project-status': 'status', 'at-risk': 'risk', resources: 'resources', deliverables: 'deliverables',
+  'near-capacity': 'capacity', dependencies: 'chain', budget: 'budget',
+}
+
+/**
+ * All reports the caller's role may open, one per tab (?report=<key> keeps the choice in the URL;
+ * ?tab=<slug> opens one too). A report the role may not open, or an unknown name, opens the first tab.
+ */
 export default function ReportsPage() {
   const { role } = useAuth()
   const [params, setParams] = useSearchParams()
   const allowed = reportsFor(role)
-  const current = allowed.includes(params.get('report')) ? params.get('report') : allowed[0]
+  const tab = params.get('tab') ?? ''
+  const asked = params.get('report') ?? (Object.hasOwn(TAB_SLUGS, tab) ? TAB_SLUGS[tab] : null)
+  const current = allowed.includes(asked) ? asked : allowed[0]
   const { View } = REPORTS[current]
 
   return (

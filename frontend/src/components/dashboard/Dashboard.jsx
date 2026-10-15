@@ -36,12 +36,16 @@ export default function Dashboard({ role }) {
 
       <Box component="section" aria-labelledby="glance-heading" sx={{ mb: 3 }}>
         <Typography id="glance-heading" variant="h6" component="h2" gutterBottom>At a glance</Typography>
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
-          <StatCard id="stat-active" title="Active projects" result={status} count={activeCount} />
-          <StatCard id="stat-risk" title="At risk" result={risk} count={atRiskCount} />
-          <StatCard id="stat-overdue" title="Overdue deliverables" result={status} count={overdueCount} />
-          <StatCard id="stat-budget" title="Over budget" result={budget} count={overBudgetCount} />
-          <StatCard id="stat-capacity" title="Near capacity" result={capacity} count={nearCapacityCount} />
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+          <StatCard id="stat-active" title="Active projects" result={status} count={activeCount}
+            to="/projects?status=active" />
+          <StatCard id="stat-risk" title="At risk" result={risk} count={atRiskCount} to="/reports?tab=at-risk" />
+          <StatCard id="stat-overdue" title="Overdue deliverables" result={status} count={overdueCount}
+            to="/reports?tab=deliverables" />
+          <StatCard id="stat-budget" title="Over budget" result={budget} count={overBudgetCount}
+            to="/reports?tab=budget" />
+          <StatCard id="stat-capacity" title="Near capacity" result={capacity} count={nearCapacityCount}
+            to="/reports?tab=near-capacity" />
         </Box>
       </Box>
 

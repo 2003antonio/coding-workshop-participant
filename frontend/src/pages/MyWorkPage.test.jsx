@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { mondayOf, projectsIn, weeksFromAllocations } from '../components/mywork/weekMath'
 import { reply, seedData, signedInAs } from '../test/fakeApiServer'
@@ -160,13 +160,12 @@ describe('My work in the menu and on Home', () => {
       .toHaveAttribute('aria-current', 'page')
   })
 
-  it('an employee’s Home shows the welcome heading and the same My work view', async () => {
+  it('an employee’s Home links to My work instead of repeating the chart', async () => {
     signedInAs('employee')
     renderApp('/')
     expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Eve Employee' })).toBeInTheDocument()
-    expect(await hoursTable()).toBeInTheDocument()
-    expect(await screen.findByRole('table', { name: 'Assignments' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByRole('status', { name: /^Loading/ })).not.toBeInTheDocument())
+    expect(await screen.findByRole('link', { name: 'This week' })).toHaveAttribute('href', '/my-work')
+    expect(screen.queryByRole('table', { name: 'Assignments' })).not.toBeInTheDocument()
   })
 })
 

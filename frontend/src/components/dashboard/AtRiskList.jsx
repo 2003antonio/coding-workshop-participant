@@ -39,6 +39,10 @@ export default function AtRiskList({ projects }) {
           </Typography>
           <Typography variant="body2" color="text.secondary">{p.team?.name}</Typography>
           <RiskChips name={p.name} reasons={p.reasons} />
+          <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`} aria-label={`View project ${p.name}`}
+            variant="body2" sx={{ display: 'inline-block', mt: 1, fontWeight: 600 }}>
+            View project →
+          </Link>
         </Box>
       ))}
     </Box>
