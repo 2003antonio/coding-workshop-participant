@@ -3,7 +3,9 @@
 // The server already limits each report to what the caller may see (§8).
 import { useCallback } from 'react'
 import Box from '@mui/material/Box'
+import Link from '@mui/material/Link'
 import Typography from '@mui/material/Typography'
+import { Link as RouterLink } from 'react-router-dom'
 import { useLoad } from '../../auth/useApi'
 import * as reportService from '../../services/reportService'
 import AtRiskList from './AtRiskList'
@@ -16,6 +18,11 @@ import StatCard from './StatCard'
 import Paper from '@mui/material/Paper'
 import Skeleton from '@mui/material/Skeleton'
 import StatusBar from '../viz/StatusBar'
+import ComingUp from '../ComingUp/ComingUp'
+import { LoadState } from '../PageState'
+
+/** "Coming up" on Home looks this many days ahead (plus everything overdue). */
+const COMING_UP_DAYS = 14
 
 /** Report 5's default: people above this many hours in a week are "near capacity". */
 const NEAR_CAPACITY_HOURS = 32
@@ -72,6 +79,8 @@ export default function Dashboard({ role }) {
     [],
   )
   const capacity = useLoad(loadCapacity)
+  const loadDeliverables = useCallback((call) => call((token) => reportService.deliverableStatus(token)), [])
+  const deliverables = useLoad(loadDeliverables)
 
   return (
     <>
@@ -93,6 +102,15 @@ export default function Dashboard({ role }) {
           <StatCard id="stat-capacity" title="Near capacity" result={capacity} count={nearCapacityCount}
             to="/reports?tab=near-capacity" />
         </Box>
+      </Box>
+
+      <Box sx={{ mb: 3 }}>
+        <LoadState result={deliverables} label="Loading coming up" skeleton="table">
+          {(data) => (
+            <ComingUp deliverables={data.deliverables} days={COMING_UP_DAYS} empty="Nothing due in the next 14 days."
+              footer={<Link component={RouterLink} to="/reports?tab=deliverables">View all deliverables</Link>} />
+          )}
+        </LoadState>
       </Box>
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, alignItems: 'start' }}>

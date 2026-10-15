@@ -396,3 +396,46 @@ describe('Home: portfolio health and the employee sparkline', () => {
     expect(greeting(new Date(2026, 10, 10, 20))).toBe('Good evening')
   })
 })
+
+describe('Home: Coming up (admin and manager)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 10, 23, 30)) // late evening: still Nov 10 on this computer
+  })
+  afterEach(() => vi.useRealTimers())
+
+  const item = (id, due, extra = {}) => ({
+    id, name: `D ${id}`, project: { id: 'p-1', name: 'Billing v2' }, status: 'in_progress', start_date: '2026-11-02',
+    due_date: due, overdue: due < '2026-11-10', blocked: false, blocking: [], ...extra,
+  })
+
+  it('lists overdue and next-14-days deliverables, soonest first, at most six, each linking to its project', async () => {
+    signedInAs('manager', {
+      routes: {
+        'GET /api/reports/deliverable-status': () => reply(200, { deliverables: [
+          item('late', '2026-11-03'), item('soon', '2026-11-12'), item('edge', '2026-11-24'), item('far', '2026-11-25'),
+          item('done', '2026-11-11', { status: 'done' }), item('a', '2026-11-13'), item('b', '2026-11-14'),
+          item('c', '2026-11-15'), item('d', '2026-11-16'),
+        ] }),
+      },
+    })
+    renderApp('/')
+    const card = await screen.findByRole('region', { name: 'Coming up' })
+    const links = await within(card).findAllByRole('link', { name: /^D / })
+    expect(links.map((l) => l.textContent)).toEqual(['D late', 'D soon', 'D a', 'D b', 'D c', 'D d'])
+    expect(links[0]).toHaveAttribute('href', '/projects/p-1')
+    expect(within(card).getByText('7 days overdue')).toBeInTheDocument()
+    expect(within(card).getByText('Due in 2 days')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'View all deliverables' }))
+      .toHaveAttribute('href', '/reports?tab=deliverables')
+  })
+
+  it('says when nothing is due in the next 14 days', async () => {
+    signedInAs('admin', {
+      routes: { 'GET /api/reports/deliverable-status': () => reply(200, { deliverables: [item('far', '2026-12-01')] }) },
+    })
+    renderApp('/')
+    const card = await screen.findByRole('region', { name: 'Coming up' })
+    expect(await within(card).findByText('Nothing due in the next 14 days.')).toBeInTheDocument()
+  })
+})
