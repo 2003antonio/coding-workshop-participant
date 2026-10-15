@@ -25,7 +25,7 @@ import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { ARCHIVE_NOTE } from './apiMessages'
 import { ROLE_LABELS } from './format'
-import { leadCandidates, memberCandidates } from './people'
+import { leadCandidates, memberCandidates, memberLeads } from './people'
 
 /** Weekly and yearly salary totals for the lead and admins, or why they are hidden. */
 function TeamBudget({ teamId }) {
@@ -69,13 +69,15 @@ export default function TeamDetailPage() {
     people.reload()
   }
 
-  async function handleEdit(changes) {
+  async function handleEdit({ removeMemberFirst, ...changes }) {
     if (Object.keys(changes).length === 0) {
       setDialog(null)
       return
     }
+    // A member becomes the lead: leave the team first (the server refuses a lead who is a member).
+    if (removeMemberFirst) await api((token) => teamService.removeMember(token, id, removeMemberFirst.id))
     const updated = await api((token) => teamService.updateTeam(token, id, changes))
-    finish(`Team updated: ${updated.name}`)
+    finish(removeMemberFirst ? `Lead changed: ${removeMemberFirst.name} (removed from members)` : `Team updated: ${updated.name}`)
   }
 
   async function handleAdd(employeeId) {
@@ -163,10 +165,11 @@ export default function TeamDetailPage() {
               ]} />
             </Box>
 
-            {canSeeTeamBudget(role, user, data) && <TeamBudget teamId={data.id} />}
+            {canSeeTeamBudget(role, user, data) && <TeamBudget key={data.member_count} teamId={data.id} />}
 
             {dialog?.kind === 'edit' && (
               <TeamFormDialog team={data} leads={leadCandidates(people.data, data.id)}
+                members={memberLeads(people.data, data.id)}
                 onClose={() => setDialog(null)} onSubmit={handleEdit} />
             )}
             {dialog?.kind === 'add' && (

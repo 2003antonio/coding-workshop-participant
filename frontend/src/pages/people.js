@@ -7,6 +7,10 @@ const isActive = (e) => !e.archived_at
 export const leadCandidates = (employees, teamId = null) =>
   employees.filter((e) => isActive(e) && ['manager', 'admin'].includes(e.role) && (!teamId || e.team_id !== teamId))
 
+/** Managers and admins who are members of this team: they may lead it only after leaving it. */
+export const memberLeads = (employees, teamId) =>
+  employees.filter((e) => isActive(e) && ['manager', 'admin'].includes(e.role) && teamId && e.team_id === teamId)
+
 /** May join a team: active, on no team, and not its lead. */
 export const memberCandidates = (employees, team) =>
   employees.filter((e) => isActive(e) && !e.team_id && e.id !== team.lead?.id)

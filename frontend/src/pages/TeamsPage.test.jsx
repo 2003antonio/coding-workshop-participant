@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { reply, signedInAs } from '../test/fakeApiServer'
+import { reply, seedData, signedInAs } from '../test/fakeApiServer'
 import { choose, renderApp, rowFor } from '../test/renderApp'
 
 describe('Teams list', () => {
@@ -194,5 +194,28 @@ describe('Team detail', () => {
     const list = await screen.findByRole('list', { name: 'Members' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(3)
     expect(within(list).getByRole('button', { name: 'Remove Eve Employee' })).toBeInTheDocument()
+  })
+})
+
+describe('Edit team lead: a member who could lead', () => {
+  it('is listed greyed out, and becomes lead only after confirming; then leaves the members first', async () => {
+    const db = seedData()
+    db.employees.push({ id: 'u-9', name: 'Lee Lead', role: 'manager', job_title: 'Tech Lead', salary: 110000,
+      team_id: 't-1', email: 'lee@acme.test', archived_at: null })
+    const server = signedInAs('admin', { db })
+    const { user } = renderApp('/teams/t-1')
+    await user.click(await screen.findByRole('button', { name: 'Edit team' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Platform' })
+    await choose(user, /lead/i, 'Lee Lead (member, remove them from the team first)', dialog)
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(within(dialog).getByText('Tick the box to take Lee Lead off the members first.')).toBeInTheDocument()
+    expect(server.count('PUT', '/api/teams/t-1')).toBe(0)
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Make lead and remove from members' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Lead changed: Lee Lead (removed from members)')).toBeInTheDocument()
+    const writes = server.calls.filter((c) => c.method === 'DELETE' || c.method === 'PUT').map((c) => `${c.method} ${c.path}`)
+    expect(writes).toEqual(['DELETE /api/teams/t-1/members/u-9', 'PUT /api/teams/t-1'])
+    expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ lead_id: 'u-9' })
   })
 })
