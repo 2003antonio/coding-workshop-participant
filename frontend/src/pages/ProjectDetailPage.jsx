@@ -19,7 +19,9 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import PageHeader from '../components/PageHeader'
 import DeliverablesSection from '../components/DeliverablesSection'
 import { LoadState } from '../components/PageState'
-import ProjectBudgetSection, { ProjectBudgetBar } from '../components/ProjectBudgetSection'
+import ProjectBudgetSection from '../components/ProjectBudgetSection'
+import ProjectHealthStrip from '../components/health/ProjectHealthStrip'
+import ProjectTile from '../components/viz/ProjectTile'
 import ProjectFormDialog from '../components/ProjectFormDialog'
 import { ProjectRefreshContext } from '../components/projectRefresh'
 import StatusChip from '../components/StatusChip'
@@ -88,7 +90,7 @@ export default function ProjectDetailPage() {
             const current = tabs.some(([key]) => key === tab) ? tab : 'deliverables'
             return (
               <>
-                <PageHeader title={project.name}
+                <PageHeader title={project.name} icon={<ProjectTile name={project.name} size={isPhone ? 40 : 48} />}
                   subtitle={`${project.team.name} · Manager: ${project.manager?.name ?? 'none'} · `
                     + `${formatDate(project.start_date)} – ${formatDate(project.end_date)}`}
                   actions={canEdit && (
@@ -106,7 +108,7 @@ export default function ProjectDetailPage() {
                         {project.archived_at && <Chip label="Archived" size="small" />}
                       </Box>
                       {project.description && <Typography sx={{ mt: 1 }}>{project.description}</Typography>}
-                      {canManage && <Box sx={{ mt: 2 }}><ProjectBudgetBar project={project} /></Box>}
+                      <ProjectHealthStrip project={project} showBudget={canManage} ownOnly={role === 'employee'} />
                     </>
                   )} />
                 {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}

@@ -473,3 +473,25 @@ describe('Project detail: one refresh for the whole page', () => {
     expect(server.count('GET', '/api/projects/p-1/budget')).toBeGreaterThan(budgetCalls)
   })
 })
+
+describe('Project detail: health strip', () => {
+  it('shows budget, schedule and people tiles to the manager; employees get no budget tile', async () => {
+    signedInAs('admin')
+    renderApp('/projects/p-1')
+    const strip = await screen.findByTestId('health-strip')
+    expect(within(strip).getAllByRole('region').map((r) => r.getAttribute('aria-label')))
+      .toEqual(expect.arrayContaining(['Budget', 'Budget summary', 'Schedule', 'People']))
+    expect(await within(strip).findByRole('list', { name: 'Deliverables by status' })).toBeInTheDocument()
+    expect(await within(strip).findByRole('img', { name: /^\d+ (person|people): / })).toBeInTheDocument()
+  })
+
+  it('an employee sees schedule and their own hours, never a budget', async () => {
+    const server = signedInAs('employee')
+    renderApp('/projects/p-1')
+    const strip = await screen.findByTestId('health-strip')
+    await within(strip).findByText(/^You, \d+ h this week$/)
+    expect(within(strip).queryByRole('region', { name: 'Budget' })).not.toBeInTheDocument()
+    expect(within(strip).queryByText(/\$/)).not.toBeInTheDocument()
+    expect(server.count('GET', '/api/projects/p-1/budget')).toBe(0)
+  })
+})

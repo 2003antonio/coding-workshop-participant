@@ -28,9 +28,10 @@ export function Updating() {
 /**
  * The project header's budget: the same bar as Home and Reports (committed
  * against planned, spent so far inside it, "Over budget" only when over), in
- * words with $ amounts. Hidden totals say "Hidden", never 0.
+ * words with $ amounts. Hidden totals say "Hidden", never 0. `bare` leaves out
+ * its own "Budget" label (the health strip tile has one).
  */
-export function ProjectBudgetBar({ project }) {
+export function ProjectBudgetBar({ project, bare = false }) {
   const load = useCallback(
     (call) => call((token) => budgetService.getProjectBudget(token, project.id)),
     [project.id],
@@ -52,8 +53,8 @@ export function ProjectBudgetBar({ project }) {
   }
   return (
     <Box component="section" aria-label="Budget summary" aria-busy={result.updating}
-      sx={{ maxWidth: 440, opacity: result.updating ? 0.7 : 1, transition: 'opacity 150ms' }}>
-      <BudgetBar budget={result.data} name={(
+      sx={{ maxWidth: bare ? 'none' : 440, opacity: result.updating ? 0.7 : 1, transition: 'opacity 150ms' }}>
+      <BudgetBar budget={result.data} name={bare ? (result.updating && <Updating />) : (
         <Typography variant="subtitle2" component="span">
           Budget{result.updating && <Updating />}
         </Typography>
