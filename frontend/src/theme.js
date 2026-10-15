@@ -183,6 +183,19 @@ const theme = createTheme({
       },
     },
     MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
+    // The chosen option of a toggle group reads as chosen in both schemes (in dark mode the
+    // default made it dimmer than the others): brand colour on a light tint of it.
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          color: 'var(--mui-palette-text-secondary)',
+          '&.Mui-selected, &.Mui-selected:hover': {
+            color: 'var(--mui-palette-primary-main)',
+            backgroundColor: 'rgba(var(--mui-palette-primary-mainChannel) / 0.16)',
+          },
+        },
+      },
+    },
     MuiLinearProgress: {
       defaultProps: { color: 'secondary' },
       styleOverrides: { root: { borderRadius: 4, height: 8 } },
