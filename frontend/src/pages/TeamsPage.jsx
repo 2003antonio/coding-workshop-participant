@@ -10,6 +10,7 @@ import { canManageTeams } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
+import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 import { LoadState } from '../components/PageState'
 import { useMotion } from '../components/motion/motion'
@@ -23,7 +24,7 @@ import { leadCandidates } from './people'
 /** One card per team: name, lead (with avatar), and the members as a stack with their count. */
 function TeamCards({ rows, empty }) {
   const motion = useMotion()
-  if (rows.length === 0) return <Typography color="text.secondary" sx={{ py: 3 }}>{empty}</Typography>
+  if (rows.length === 0) return <EmptyState compact title={empty} />
   return (
     <Box component="ul" aria-label="Teams" sx={{
       listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 2,

@@ -11,11 +11,12 @@ import { Link as RouterLink } from 'react-router-dom'
  *     Projects you create or are assigned to show up here.
  *   </EmptyState>
  * action: { label, onClick } for a button or { label, to } for a link styled as one.
+ * `compact` for the empty state inside a tab or under filters.
  */
-export default function EmptyState({ icon: Icon = InboxOutlined, title, children, action }) {
+export default function EmptyState({ icon: Icon = InboxOutlined, title, children, action, compact = false }) {
   return (
     <Paper variant="outlined" sx={{
-      px: 3, py: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 1,
+      px: 3, py: compact ? 3 : 5, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 1,
       borderStyle: 'dashed', bgcolor: 'transparent',
     }}>
       <Box aria-hidden="true" sx={{

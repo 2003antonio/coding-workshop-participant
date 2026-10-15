@@ -129,6 +129,10 @@ const theme = createTheme({
       styleOverrides: {
         // Digits all the same width, so money, hours and percentages line up in columns and do not jiggle on update.
         body: { fontVariantNumeric: 'tabular-nums' },
+        // One visible focus ring for everything reached by keyboard.
+        'a:focus-visible, button:focus-visible, [role="tab"]:focus-visible, [role="button"]:focus-visible': {
+          outline: '2px solid var(--mui-palette-primary-main)', outlineOffset: 2,
+        },
         // Respect "reduce motion": no shimmer, no sliding drawers.
         '@media (prefers-reduced-motion: reduce)': {
           '*, *::before, *::after': {
@@ -146,6 +150,15 @@ const theme = createTheme({
       },
     },
     MuiButton: { defaultProps: { disableElevation: true } },
+    // Links look the same everywhere: brand colour, a little bolder, underline kept (colour is not the only signal).
+    MuiLink: {
+      styleOverrides: {
+        root: {
+          fontWeight: 600, textUnderlineOffset: '3px', textDecorationThickness: '1px',
+          '&:hover': { textDecorationThickness: '2px' },
+        },
+      },
+    },
     MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
     MuiLinearProgress: {
       defaultProps: { color: 'secondary' },

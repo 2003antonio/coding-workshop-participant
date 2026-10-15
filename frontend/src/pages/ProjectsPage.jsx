@@ -23,6 +23,7 @@ import { canCreateProjects, canManageProject } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
+import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageHeader from '../components/PageHeader'
 import { LoadState } from '../components/PageState'
@@ -54,7 +55,7 @@ function savedView() {
 /** The projects as cards: tile, name, team, status and dates (the same data as the table). */
 function ProjectCards({ rows, empty, archiveButton }) {
   const motion = useMotion()
-  if (rows.length === 0) return <Typography color="text.secondary" sx={{ py: 3 }}>{empty}</Typography>
+  if (rows.length === 0) return <EmptyState compact title={empty} />
   return (
     <Box component="ul" aria-label="Projects" sx={{
       listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 2,

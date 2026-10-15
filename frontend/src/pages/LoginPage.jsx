@@ -63,8 +63,17 @@ export default function LoginPage() {
   const form = (
     <Box component="form" onSubmit={handleSubmit} noValidate
       sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+        <Box aria-hidden="true" sx={{
+          width: 44, height: 44, borderRadius: '12px', bgcolor: 'sidebar.bg', color: 'sidebar.accent',
+          display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 22, flexShrink: 0,
+        }}>A</Box>
+        <Box>
+          <Typography sx={{ fontWeight: 800, lineHeight: 1.2 }}>ACME Project Tracker</Typography>
+          <Typography variant="body2" color="text.secondary">Projects, people and budgets in one place.</Typography>
+        </Box>
+      </Box>
       <Typography variant="h5" component="h1">Sign in</Typography>
-      <Typography variant="body2" color="text.secondary">ACME Project Tracker</Typography>
       <TextField
         label="Email"
         type="email"
@@ -100,14 +109,17 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: isPhone ? 'flex-start' : 'center',
       justifyContent: 'center',
-      bgcolor: isPhone ? 'background.paper' : 'grey.100',
+      bgcolor: isPhone ? 'background.paper' : 'background.default',
+      backgroundImage: isPhone ? 'none' : (t) => `radial-gradient(circle at 20% 10%, ${(t.vars ?? t).palette.action.hover}, transparent 45%)`,
       px: 2,
       pt: isPhone ? 6 : 0,
     }}>
       {isPhone ? (
         <Box sx={{ width: '100%' }}>{form}</Box>
       ) : (
-        <Paper elevation={3} sx={{ width: 400, p: 4 }}>{form}</Paper>
+        <Paper elevation={3} sx={{ width: 420, maxWidth: '100%', p: 4, borderRadius: '16px', borderTop: 4, borderColor: 'secondary.main' }}>
+          {form}
+        </Paper>
       )}
     </Box>
   )

@@ -8,6 +8,7 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import { useMediaQuery } from 'react-responsive'
+import EmptyState from './EmptyState'
 
 /**
  * A table on wide screens, a list of cards on a phone.
@@ -28,7 +29,7 @@ export default function ResponsiveTable({ label, columns, rows, empty, rowKey = 
   }
 
   if (rows.length === 0) {
-    return <Typography color="text.secondary" sx={{ py: 3 }}>{empty}</Typography>
+    return <EmptyState compact title={empty} />
   }
 
   if (isPhone) {
