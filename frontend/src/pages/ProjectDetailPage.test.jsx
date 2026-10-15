@@ -18,7 +18,7 @@ describe('Project detail: header and tabs', () => {
     await user.click(screen.getByRole('button', { name: 'Archive project' }))
     const dialog = await screen.findByRole('dialog', { name: 'Archive Billing v2?' })
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
-    expect(await screen.findByText('Billing v2 was archived.')).toBeInTheDocument()
+    expect(await screen.findByText('Project archived: Billing v2')).toBeInTheDocument()
     expect(server.count('POST', '/api/projects/p-1/archive')).toBe(1)
     expect(await screen.findByText('Archived')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive project' })).not.toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('Project detail: deliverables', () => {
     const { user } = renderApp('/projects/p-1')
     await deliverablesTable()
     await choose(user, 'Status of Backend', 'Done')
-    expect(await screen.findByText('Backend is now done.')).toBeInTheDocument()
+    expect(await screen.findByText('Status changed: Backend is now done')).toBeInTheDocument()
     await waitFor(() => expect(within(rowFor('Frontend')).queryByText('Blocked')).not.toBeInTheDocument())
   })
 
@@ -106,7 +106,7 @@ describe('Project detail: deliverables', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /Backend/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Add deliverable' }))
 
-    expect(await screen.findByText('Launch was added.')).toBeInTheDocument()
+    expect(await screen.findByText('Deliverable added: Launch')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'POST' && c.path === '/api/projects/p-1/deliverables/').body).toEqual({
       name: 'Launch', description: '', start_date: '2027-01-04', due_date: '2027-01-15', depends_on: ['d-3', 'd-2'],
     })
@@ -138,7 +138,7 @@ describe('Project detail: deliverables', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /Backend/ }))
     await user.click(within(dialog).getByRole('checkbox', { name: /API spec/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Save dependencies' }))
-    expect(await screen.findByText('Dependencies of Frontend were saved.')).toBeInTheDocument()
+    expect(await screen.findByText('Dependencies saved: Frontend')).toBeInTheDocument()
     await waitFor(() => expect(within(rowFor('Frontend')).queryByText('Blocked')).not.toBeInTheDocument())
   })
 
@@ -199,12 +199,12 @@ describe('Project detail: people', () => {
     await user.clear(within(dialog).getByLabelText(/end date/i))
     await user.type(within(dialog).getByLabelText(/end date/i), '2026-12-18')
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }))
-    expect(await screen.findByText('Cy Coder was assigned.')).toBeInTheDocument()
+    expect(await screen.findByText('Person assigned: Cy Coder')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Remove Bo Builder' }))
     const confirm = await screen.findByRole('dialog', { name: 'Remove Bo Builder from Billing v2?' })
     await user.click(within(confirm).getByRole('button', { name: 'Remove' }))
-    expect(await screen.findByText('Bo Builder was removed from this project.')).toBeInTheDocument()
+    expect(await screen.findByText('Assignment removed: Bo Builder')).toBeInTheDocument()
     expect(server.count('POST', '/api/allocations/a-2/archive')).toBe(1)
     await waitFor(() => expect(screen.queryByRole('rowheader', { name: 'Bo Builder' })).not.toBeInTheDocument())
   })
@@ -339,7 +339,7 @@ describe('Project detail: edit and planned budget', () => {
     await user.type(budget, '5,000.50')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Billing v2 was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Project updated: Billing v2')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT' && c.path === '/api/projects/p-1').body)
       .toEqual({ planned_budget: 5000.5 })
     const panel = await screen.findByRole('region', { name: 'Project budget' })
@@ -358,7 +358,7 @@ describe('Project detail: edit and planned budget', () => {
     await choose(user, /status/i, 'On hold', dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Billing v2 was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Project updated: Billing v2')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ status: 'on_hold', planned_budget: null })
     expect(await screen.findByText('On hold')).toBeInTheDocument()
   })

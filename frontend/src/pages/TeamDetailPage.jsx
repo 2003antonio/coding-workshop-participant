@@ -18,6 +18,7 @@ import ResponsiveTable from '../components/ResponsiveTable'
 import { PersonName } from '../components/viz/Avatar'
 import ProjectTile from '../components/viz/ProjectTile'
 import { AddMemberDialog, TeamFormDialog } from '../components/TeamDialogs'
+import { useToast } from '../components/toast/toast'
 import * as budgetService from '../services/budgetService'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
@@ -48,7 +49,7 @@ export default function TeamDetailPage() {
   const { user, role } = useAuth()
   const api = useApi()
   const isAdmin = canManageTeams(role)
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   // null, { kind: 'edit' }, { kind: 'add' }, { kind: 'archive' } or { kind: 'remove', member }
   const [dialog, setDialog] = useState(null)
 
@@ -62,7 +63,7 @@ export default function TeamDetailPage() {
 
   function finish(message) {
     setDialog(null)
-    setNotice(message)
+    toast(message)
     team.reload()
     people.reload()
   }
@@ -73,24 +74,24 @@ export default function TeamDetailPage() {
       return
     }
     const updated = await api((token) => teamService.updateTeam(token, id, changes))
-    finish(`${updated.name} was updated.`)
+    finish(`Team updated: ${updated.name}`)
   }
 
   async function handleAdd(employeeId) {
     const name = people.data.find((p) => p.id === employeeId)?.name
     await api((token) => teamService.addMember(token, id, employeeId))
-    finish(`${name} was added to the team.`)
+    finish(`Member added: ${name}`)
   }
 
   async function handleRemove() {
     const { member } = dialog
     await api((token) => teamService.removeMember(token, id, member.id))
-    finish(`${member.name} was removed from the team.`)
+    finish(`Member removed: ${member.name}`)
   }
 
   async function handleArchive() {
     const archived = await api((token) => teamService.archiveTeam(token, id))
-    finish(`${archived.name} was archived.`)
+    finish(`Team archived: ${archived.name}`)
   }
 
   return (
@@ -115,7 +116,6 @@ export default function TeamDetailPage() {
                   </Button>
                 </>
               )} />
-            {notice && <Alert severity="success" role="status" onClose={() => setNotice('')}>{notice}</Alert>}
             {data.archived_at && <Alert severity="info">This team is archived.</Alert>}
 
             <Box component="section" aria-labelledby="members-heading">

@@ -12,6 +12,7 @@ import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import { useToast } from '../components/toast/toast'
 import { LoadState } from '../components/PageState'
 import { useMotion } from '../components/motion/motion'
 import Avatar, { AvatarStack } from '../components/viz/Avatar'
@@ -68,7 +69,7 @@ export default function TeamsPage() {
   const api = useApi()
   const isAdmin = canManageTeams(role)
   const [creating, setCreating] = useState(false)
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
 
   // The list has member counts only; each team's own page has the names for the avatar stack
   // (a handful of teams, fetched together). A team whose details fail just shows its count.
@@ -87,7 +88,7 @@ export default function TeamsPage() {
   async function handleCreate(payload) {
     const created = await api((token) => teamService.createTeam(token, payload))
     setCreating(false)
-    setNotice(`${created.name} was created.`)
+    toast(`Team created: ${created.name}`)
     teams.reload()
   }
 
@@ -105,9 +106,6 @@ export default function TeamsPage() {
             New team
           </Button>
         )} />
-      {notice && (
-        <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>
-      )}
       <LoadState result={teams} label="Loading teams" skeleton="cards">
         {(rows) => (
           <TeamCards rows={rows} empty={emptyText} />

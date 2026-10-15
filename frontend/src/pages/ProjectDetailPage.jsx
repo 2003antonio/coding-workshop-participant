@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react'
-import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -26,6 +25,7 @@ import ProjectFormDialog from '../components/ProjectFormDialog'
 import { ProjectRefreshContext } from '../components/projectRefresh'
 import StatusChip from '../components/StatusChip'
 import { useMotion } from '../components/motion/motion'
+import { useToast } from '../components/toast/toast'
 import DependenciesSection from '../components/timeline/DependenciesSection'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
@@ -41,7 +41,7 @@ export default function ProjectDetailPage() {
   const [tab, setTab] = useState('deliverables')
   const [archiving, setArchiving] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   // The page's one refresh: any change on it (project, deliverable, assignment) bumps
   // refreshKey, and the project, header budget, health strip and open tab load again.
   const [refreshKey, setRefreshKey] = useState(0)
@@ -60,7 +60,7 @@ export default function ProjectDetailPage() {
   async function handleEdit(changes) {
     if (Object.keys(changes).length) {
       const updated = await api((token) => projectService.updateProject(token, id, changes))
-      setNotice(`${updated.name} was updated.`)
+      toast(`Project updated: ${updated.name}`)
       refresh()
     }
     setEditing(false)
@@ -69,7 +69,7 @@ export default function ProjectDetailPage() {
   async function handleArchive() {
     const archived = await api((token) => projectService.archiveProject(token, id))
     setArchiving(false)
-    setNotice(`${archived.name} was archived.`)
+    toast(`Project archived: ${archived.name}`)
     refresh()
   }
 
@@ -111,7 +111,6 @@ export default function ProjectDetailPage() {
                       <ProjectHealthStrip project={project} showBudget={canManage} ownOnly={role === 'employee'} />
                     </>
                   )} />
-                {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
 
                 <Paper variant="outlined" sx={{ mb: 2 }}>
                   <Tabs value={current} onChange={(event, value) => setTab(value)} aria-label="Project sections"

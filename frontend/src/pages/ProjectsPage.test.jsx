@@ -206,7 +206,7 @@ describe('Projects list: actions', () => {
     expect(dialog).toHaveAccessibleDescription(/deliverables and assignments are archived too/i)
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
 
-    expect(await screen.findByText('Billing v2 was archived.')).toBeInTheDocument()
+    expect(await screen.findByText('Project archived: Billing v2')).toBeInTheDocument()
     expect(server.count('POST', '/api/projects/p-1/archive')).toBe(1)
     expect(await screen.findByText('No projects to show yet.')).toBeInTheDocument()
   })

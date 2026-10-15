@@ -29,6 +29,7 @@ import MaskedMoney from '../components/MaskedMoney'
 import PageHeader from '../components/PageHeader'
 import { PersonName } from '../components/viz/Avatar'
 import { LoadState } from '../components/PageState'
+import { useToast } from '../components/toast/toast'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { messageFor as teamMessageFor } from './apiMessages'
@@ -104,7 +105,7 @@ export default function EmployeesPage() {
   const isAdmin = canManageEmployees(role)
 
   const [showArchived, setShowArchived] = useState(false)
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   const [warning, setWarning] = useState('')
   // null, { kind: 'create' }, { kind: 'edit', employee } or { kind: 'archive', employee }
   const [dialog, setDialog] = useState(null)
@@ -131,7 +132,7 @@ export default function EmployeesPage() {
 
   function finish(message, teamWarning = '') {
     setDialog(null)
-    setNotice(message)
+    toast(message)
     setWarning(teamWarning)
     employees.reload()
     teamsResult.reload()
@@ -156,19 +157,19 @@ export default function EmployeesPage() {
   async function handleCreate(payload, teamId) {
     const created = await api((token) => employeeService.createEmployee(token, payload))
     const teamWarning = await moveToTeam(created, null, teamId)
-    finish(`${created.name} was added.`, teamWarning)
+    finish(`Employee added: ${created.name}`, teamWarning)
   }
 
   async function handleEdit(payload, teamId) {
     const { employee } = dialog
     const updated = await api((token) => employeeService.updateEmployee(token, employee.id, payload))
     const teamWarning = await moveToTeam(updated, employee.team_id, teamId)
-    finish(`${updated.name} was updated.`, teamWarning)
+    finish(`Employee updated: ${updated.name}`, teamWarning)
   }
 
   async function handleArchive() {
     const archived = await api((token) => employeeService.archiveEmployee(token, dialog.employee.id))
-    finish(`${archived.name} was archived.`)
+    finish(`Employee archived: ${archived.name}`)
   }
 
   if (!allowed) {
@@ -197,12 +198,6 @@ export default function EmployeesPage() {
             </Button>
           </>
         )} />
-
-      {notice && (
-        <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>
-          {notice}
-        </Alert>
-      )}
 
       {warning && (
         <Alert severity="warning" onClose={() => setWarning('')} sx={{ mb: 2 }}>{warning}</Alert>

@@ -32,7 +32,7 @@ describe('Employees page: teams', () => {
     await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
-    expect(await screen.findByText('Kai Kim was added.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee added: Kai Kim')).toBeInTheDocument()
     const post = server.calls.find((c) => c.method === 'POST' && c.path === '/api/employees/')
     expect(post.body).not.toHaveProperty('team_id') // membership is not part of the employee record
     const member = server.calls.find((c) => c.path === '/api/teams/t-2/members')
@@ -50,7 +50,7 @@ describe('Employees page: teams', () => {
     await choose(user, /team/i, 'Data', dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Eve Employee was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Eve Employee')).toBeInTheDocument()
     const teamCalls = server.calls.filter((c) => c.path.includes('/members'))
     expect(teamCalls.map((c) => `${c.method} ${c.path}`))
       .toEqual(['DELETE /api/teams/t-1/members/u-3', 'POST /api/teams/t-2/members'])
@@ -64,7 +64,7 @@ describe('Employees page: teams', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Bo Builder' }))
     let dialog = await screen.findByRole('dialog', { name: 'Edit Bo Builder' })
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
-    await screen.findByText('Bo Builder was updated.')
+    await screen.findByText('Employee updated: Bo Builder')
     expect(server.calls.filter((c) => c.path.includes('/members'))).toHaveLength(0)
 
     await user.click(screen.getByRole('button', { name: 'Edit Bo Builder' }))
@@ -96,7 +96,7 @@ describe('Employees page: teams', () => {
     await choose(user, /team/i, 'Data', dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Nia New was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Nia New')).toBeInTheDocument()
     expect(screen.getByText(
       'Nia New was saved, but their team was not changed: A team lead cannot also be a member of the team they lead.',
     )).toBeInTheDocument()

@@ -29,7 +29,7 @@ describe('Teams list', () => {
     await user.keyboard('{Escape}')
     await user.click(within(dialog).getByRole('button', { name: 'Create team' }))
 
-    expect(await screen.findByText('Mobile was created.')).toBeInTheDocument()
+    expect(await screen.findByText('Team created: Mobile')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'POST' && c.path === '/api/teams/').body)
       .toEqual({ name: 'Mobile', lead_id: 'u-6' })
     expect(await screen.findByRole('link', { name: 'Mobile' })).toBeInTheDocument()
@@ -104,14 +104,14 @@ describe('Team detail', () => {
     await user.click(screen.getByRole('option', { name: /Nia New/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Add member' }))
 
-    expect(await screen.findByText('Nia New was added to the team.')).toBeInTheDocument()
+    expect(await screen.findByText('Member added: Nia New')).toBeInTheDocument()
     expect(server.calls.find((c) => c.path === '/api/teams/t-2/members').body).toEqual({ employee_id: 'u-8' })
     await waitFor(() => expect(rowFor('Nia New')).toBeInTheDocument())
 
     await user.click(screen.getByRole('button', { name: 'Remove Dee Data' }))
     const confirm = await screen.findByRole('dialog', { name: 'Remove Dee Data from Data?' })
     await user.click(within(confirm).getByRole('button', { name: 'Remove' }))
-    expect(await screen.findByText('Dee Data was removed from the team.')).toBeInTheDocument()
+    expect(await screen.findByText('Member removed: Dee Data')).toBeInTheDocument()
     expect(server.count('DELETE', '/api/teams/t-2/members/u-7')).toBe(1)
   })
 
@@ -124,7 +124,7 @@ describe('Team detail', () => {
     await choose(user, /lead/i, /Ada Admin/, dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Platform was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Team updated: Platform')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ lead_id: 'u-1' })
     expect(await screen.findByText('Lead: Ada Admin')).toBeInTheDocument()
   })

@@ -20,7 +20,7 @@ describe('In-place editing: hours per week', () => {
     const hours = screen.getByRole('textbox', { name: 'Change hours per week of Bo Builder' })
     await user.clear(hours)
     await user.type(hours, '14{Enter}')
-    expect(await screen.findByText("Bo Builder's assignment was updated.")).toBeInTheDocument()
+    expect(await screen.findByText('Assignment updated: Bo Builder')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ hours_per_week: 14 })
     await waitFor(() => expect(within(rowFor('Bo Builder')).getByRole('button', { name: CHANGE })).toHaveTextContent('14'))
   })
@@ -66,7 +66,7 @@ describe('In-place editing: deliverables', () => {
 
     await user.click(screen.getByRole('button', { name: 'Backend, change name of Backend' }))
     await user.type(screen.getByRole('textbox', { name: 'Change name of Backend' }), ' v2{Enter}')
-    expect(await screen.findByText('Backend v2 was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Deliverable updated: Backend v2')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ name: 'Backend v2' })
   })
 
@@ -79,7 +79,7 @@ describe('In-place editing: deliverables', () => {
     await user.clear(due)
     await user.type(due, '2026-12-11')
     await user.tab()
-    expect(await screen.findByText('Backend was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Deliverable updated: Backend')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ due_date: '2026-12-11' })
     await waitFor(() => expect(within(rowFor('Backend')).getByText('Nov 9, 2026 – Dec 11, 2026')).toBeInTheDocument())
   })

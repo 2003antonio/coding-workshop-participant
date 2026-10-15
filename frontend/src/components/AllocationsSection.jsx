@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography'
 import { canSeeSalaries } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useProjectRefresh } from './projectRefresh'
+import { useToast } from './toast/toast'
 import * as allocationService from '../services/allocationService'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
@@ -127,7 +128,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
   const api = useApi()
   const showCost = canSeeSalaries(role)
   const reveal = useRevealSet() // per person, masked until the admin clicks the eye
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   const [problem, setProblem] = useState('') // why an in-place change was undone
   const [dialog, setDialog] = useState(null) // null, { kind: 'assign' } or { kind: 'edit' | 'remove', allocation }
 
@@ -156,7 +157,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
   async function handleAssign(payload) {
     const created = await api((token) => allocationService.createAllocation(token, payload))
     setDialog(null)
-    setNotice(`${created.employee.name} was assigned.`)
+    toast(`Person assigned: ${created.employee.name}`)
     changed()
   }
 
@@ -168,17 +169,16 @@ export default function AllocationsSection({ project, canEdit, role }) {
     }
     await api((token) => allocationService.updateAllocation(token, allocation.id, changes))
     setDialog(null)
-    setNotice(`${allocation.employee.name}'s assignment was updated.`)
+    toast(`Assignment updated: ${allocation.employee.name}`)
     changed()
   }
 
   /** Hours changed in place. On a refusal the cell rolls back and this says why (with the weeks over 40 h). */
   async function saveHours(allocation, hours) {
-    setNotice('')
     setProblem('')
     try {
       await api((token) => allocationService.updateAllocation(token, allocation.id, { hours_per_week: hours }))
-      setNotice(`${allocation.employee.name}'s assignment was updated.`)
+      toast(`Assignment updated: ${allocation.employee.name}`)
       changed()
     } catch (error) {
       const details = detailsSentence(error)
@@ -191,7 +191,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
     const { allocation } = dialog
     await api((token) => allocationService.archiveAllocation(token, allocation.id))
     setDialog(null)
-    setNotice(`${allocation.employee.name} was removed from this project.`)
+    toast(`Assignment removed: ${allocation.employee.name}`)
     changed()
   }
 
@@ -211,7 +211,6 @@ export default function AllocationsSection({ project, canEdit, role }) {
           You can see only your own assignments.
         </Typography>
       )}
-      {notice && <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
       {problem && <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>}
       {people.status === 'error' && <Alert severity="warning" sx={{ mb: 2 }}>{people.error}</Alert>}
       <LoadState result={result} label="Loading assignments" skeleton="table">

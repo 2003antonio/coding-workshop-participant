@@ -226,7 +226,7 @@ describe('admin actions', () => {
     await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
-    expect(await screen.findByText('Nia New was added.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee added: Nia New')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const post = server.calls.find((c) => c.method === 'POST' && c.path === '/api/employees/')
     expect(post.body).toEqual({
@@ -276,7 +276,7 @@ describe('admin actions', () => {
     await user.type(jobTitle, 'Senior Engineer')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Eve Employee was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Eve Employee')).toBeInTheDocument()
     const put = server.calls.find((c) => c.method === 'PUT')
     // The salary was never revealed or changed, so it is not sent.
     expect(put.body).toEqual({ name: 'Eve Employee', job_title: 'Senior Engineer', role: 'employee' })
@@ -296,7 +296,7 @@ describe('admin actions', () => {
     expect(server.count('POST', '/api/employees/u-3/archive')).toBe(0)
 
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
-    expect(await screen.findByText('Eve Employee was archived.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee archived: Eve Employee')).toBeInTheDocument()
     expect(server.count('POST', '/api/employees/u-3/archive')).toBe(1)
   })
 
@@ -387,7 +387,7 @@ describe('salary click-to-reveal (admin)', () => {
     await user.clear(salary)
     await user.type(salary, '95000')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
-    expect(await screen.findByText('Eve Employee was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Eve Employee')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toMatchObject({ salary: 95000 })
   })
 

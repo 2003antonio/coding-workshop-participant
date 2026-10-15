@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -31,6 +30,7 @@ import ProjectFormDialog from '../components/ProjectFormDialog'
 import ResponsiveTable from '../components/ResponsiveTable'
 import StatusChip from '../components/StatusChip'
 import { useMotion } from '../components/motion/motion'
+import { useToast } from '../components/toast/toast'
 import ProjectTile, { ProjectName } from '../components/viz/ProjectTile'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
@@ -109,7 +109,7 @@ export default function ProjectsPage() {
   })
   const [teamId, setTeamId] = useState('')
   const [showArchived, setShowArchived] = useState(false)
-  const [notice, setNotice] = useState('')
+  const toast = useToast()
   const [dialog, setDialog] = useState(null) // null, { kind: 'create' } or { kind: 'archive', project }
   const [view, setView] = useState(savedView) // 'table' (default) or 'cards'
 
@@ -161,13 +161,14 @@ export default function ProjectsPage() {
 
   async function handleCreate(payload) {
     const created = await api((token) => projectService.createProject(token, payload))
+    toast(`Project created: ${created.name}`)
     navigate(`/projects/${encodeURIComponent(created.id)}`)
   }
 
   async function handleArchive() {
     const archived = await api((token) => projectService.archiveProject(token, dialog.project.id))
     setDialog(null)
-    setNotice(`${archived.name} was archived.`)
+    toast(`Project archived: ${archived.name}`)
     projects.reload()
   }
 
@@ -222,10 +223,6 @@ export default function ProjectsPage() {
           <ToggleButton value="cards" sx={{ gap: 0.75, px: 1.5 }}><GridViewOutlined fontSize="small" />Cards</ToggleButton>
         </ToggleButtonGroup>
       </Box>
-
-      {notice && (
-        <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>
-      )}
 
       <LoadState result={projects} label="Loading projects" skeleton="table">
         {(rows) => {

@@ -7,6 +7,7 @@ import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import { useApi, useLoad } from '../auth/useApi'
 import { useProjectRefresh } from './projectRefresh'
+import { useToast } from './toast/toast'
 import DueChip from './viz/DueChip'
 import { detailsSentence, namesOf } from '../services/errorDetails'
 import * as projectService from '../services/projectService'
@@ -34,7 +35,8 @@ const deliverableTone = (d) => {
 
 export default function DeliverablesSection({ project, canEdit }) {
   const api = useApi()
-  const [notice, setNotice] = useState(null) // { severity, text }
+  const toast = useToast()
+  const [problem, setProblem] = useState('') // why a change was refused (or undone)
   // null, { kind: 'add' }, or { kind: 'deps' | 'edit' | 'archive', deliverable }
   const [dialog, setDialog] = useState(null)
   const [saving, setSaving] = useState(null) // id of the deliverable whose status is being saved
@@ -55,7 +57,7 @@ export default function DeliverablesSection({ project, canEdit }) {
   async function handleAdd(payload) {
     const created = await api((token) => projectService.createDeliverable(token, project.id, payload))
     setDialog(null)
-    setNotice({ severity: 'success', text: `${created.name} was added.` })
+    toast(`Deliverable added: ${created.name}`)
     changed()
   }
 
@@ -63,7 +65,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     const updated = await api((token) =>
       projectService.setDependencies(token, project.id, dialog.deliverable.id, dependsOn))
     setDialog(null)
-    setNotice({ severity: 'success', text: `Dependencies of ${updated.name} were saved.` })
+    toast(`Dependencies saved: ${updated.name}`)
     changed()
   }
 
@@ -75,7 +77,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     }
     const updated = await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, changes))
     setDialog(null)
-    setNotice({ severity: 'success', text: `${updated.name} was updated.` })
+    toast(`Deliverable updated: ${updated.name}`)
     changed()
   }
 
@@ -83,23 +85,20 @@ export default function DeliverablesSection({ project, canEdit }) {
     const { deliverable } = dialog
     await api((token) => projectService.archiveDeliverable(token, project.id, deliverable.id))
     setDialog(null)
-    setNotice({ severity: 'success', text: `${deliverable.name} was archived.` })
+    toast(`Deliverable archived: ${deliverable.name}`)
     changed()
   }
 
   /** Save one field changed in place. On a refusal the cell rolls back and this says why. */
   async function saveInline(deliverable, changes) {
-    setNotice(null)
+    setProblem('')
     try {
       const updated = await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, changes))
-      setNotice({ severity: 'success', text: `${updated.name} was updated.` })
+      toast(`Deliverable updated: ${updated.name}`)
       changed()
     } catch (error) {
       const details = detailsSentence(error, { deliverables: rows })
-      setNotice({
-        severity: 'error',
-        text: `${deliverable.name}: ${messageFor(error)}${details ? ` ${details}.` : ''} The change was undone.`,
-      })
+      setProblem(`${deliverable.name}: ${messageFor(error)}${details ? ` ${details}.` : ''} The change was undone.`)
       throw error
     }
   }
@@ -117,18 +116,15 @@ export default function DeliverablesSection({ project, canEdit }) {
   }
 
   async function handleStatus(deliverable, status) {
-    setNotice(null)
+    setProblem('')
     setSaving(deliverable.id)
     try {
       await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, { status }))
-      setNotice({ severity: 'success', text: `${deliverable.name} is now ${DELIVERABLE_STATUS[status].toLowerCase()}.` })
+      toast(`Status changed: ${deliverable.name} is now ${DELIVERABLE_STATUS[status].toLowerCase()}`)
       changed()
     } catch (error) {
       const details = detailsSentence(error, { deliverables: rows })
-      setNotice({
-        severity: 'error',
-        text: `${deliverable.name}: ${messageFor(error)}${details ? ` ${details}.` : ''}`,
-      })
+      setProblem(`${deliverable.name}: ${messageFor(error)}${details ? ` ${details}.` : ''}`)
     } finally {
       setSaving(null)
     }
@@ -143,11 +139,8 @@ export default function DeliverablesSection({ project, canEdit }) {
           </Button>
         </Box>
       )}
-      {notice && (
-        <Alert severity={notice.severity} role={notice.severity === 'error' ? 'alert' : 'status'}
-          onClose={() => setNotice(null)} sx={{ mb: 2 }}>
-          {notice.text}
-        </Alert>
+      {problem && (
+        <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>
       )}
       <LoadState result={result} label="Loading deliverables" skeleton="table">
         {() => (
