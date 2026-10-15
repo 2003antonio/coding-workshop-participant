@@ -12,7 +12,8 @@ import AtRiskList from './AtRiskList'
 import BudgetBars from './BudgetBars'
 import DashboardSection from './DashboardSection'
 import {
-  activeCount, atRiskCount, nearCapacityCount, overBudgetCount, overdueCount, portfolioHealth,
+  activeCount, atRiskCount, DASHBOARD_LIST_LIMIT, nearCapacityCount, overBudgetCount, overdueCount, portfolioHealth,
+  topAtRisk, topBudgets,
 } from './dashboardMath'
 import StatCard from './StatCard'
 import Paper from '@mui/material/Paper'
@@ -26,6 +27,16 @@ const COMING_UP_DAYS = 14
 
 /** Report 5's default: people above this many hours in a week are "near capacity". */
 const NEAR_CAPACITY_HOURS = 32
+
+/** Under a dashboard list cut to DASHBOARD_LIST_LIMIT rows: a link to the whole report. */
+function ViewAll({ count, to, what }) {
+  if (count <= DASHBOARD_LIST_LIMIT) return null
+  return (
+    <Link component={RouterLink} to={to} variant="body2" sx={{ display: 'inline-block', mt: 2, fontWeight: 600 }}>
+      View all {count} {what}
+    </Link>
+  )
+}
 
 /** One bar: how many projects are healthy, at risk or over budget (each counted once). */
 function PortfolioHealth({ status, risk, budget }) {
@@ -115,10 +126,20 @@ export default function Dashboard({ role }) {
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, alignItems: 'start' }}>
         <DashboardSection id="risk-list" title="At-risk projects" result={risk} skeletonLines={4}>
-          {(data) => <AtRiskList projects={data.projects} />}
+          {(data) => (
+            <>
+              <AtRiskList projects={topAtRisk(data.projects)} />
+              <ViewAll count={data.projects.length} to="/reports?tab=at-risk" what="at-risk projects" />
+            </>
+          )}
         </DashboardSection>
         <DashboardSection id="budget-bars" title="Budget used" result={budget} skeletonLines={4}>
-          {(data) => <BudgetBars projects={data.projects} />}
+          {(data) => (
+            <>
+              <BudgetBars projects={topBudgets(data.projects)} />
+              <ViewAll count={data.projects.length} to="/reports?tab=budget" what="project budgets" />
+            </>
+          )}
         </DashboardSection>
       </Box>
     </>

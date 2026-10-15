@@ -5,7 +5,8 @@
 Auth service Lambda entry point: a thin adapter around routes.py.
 
 Unpacks the Function URL event, enforces request limits, runs migrations once
-per cold start, dispatches, and returns one consistent error shape.
+per cold start, dispatches, and returns one consistent error shape. A direct
+invoke (never the public URL) can also seed the demo data; see _direct_invoke.
 """
 
 import base64
@@ -14,7 +15,7 @@ import json
 import logging
 
 import routes
-from common import audit, responses, routing
+from common import audit, demo_bulk, demo_seed, responses, routing
 from common.errors import ApiError, BadRequest
 from common.migrations.runner import run_migrations
 
@@ -59,6 +60,60 @@ def _parse_body(event: dict) -> object:
         raise BadRequest("Malformed JSON body.")
 
 
+def _is_direct_invoke(event: dict) -> bool:
+    """True for `aws lambda invoke`, which needs IAM permission on this function.
+
+    A Function URL request (and so anything through CloudFront) always carries
+    requestContext, so the public URL can never reach the direct actions.
+    """
+    return "requestContext" not in event and "action" in event
+
+
+def _direct_invoke(event: dict) -> dict:
+    """Run an operator action. The only one is seed_demo, for the cloud database.
+
+    Event: {"action": "seed_demo", "passwords": {"admin": ..., "manager": ..., "employee": ...},
+            "bulk": true (optional: also the large demo, see common/demo_bulk.py),
+            "reset": true (optional: first remove all demo data, as seed_demo.py --reset;
+                           refused if any account is outside the demo domain)}.
+    Idempotent: each demo already present is left unchanged. Passwords are never
+    logged or returned.
+    """
+    action = event.get("action")
+    if action != "seed_demo":
+        logger.info("direct invoke: unknown action")
+        return {"ok": False, "error": "Unknown action; the only one is seed_demo."}
+    if not demo_seed.valid_passwords(event.get("passwords")):
+        logger.info("direct invoke seed_demo -> refused (passwords)")
+        return {"ok": False, "error": "passwords must give admin, manager and employee, each at "
+                                      f"least {demo_seed.MIN_PASSWORD} characters."}
+    try:
+        _ensure_migrated()
+        if event.get("reset") is True:
+            refused = demo_seed.reset()
+            if refused:
+                logger.info("direct invoke seed_demo -> refused (reset)")
+                return {"ok": False, "error": f"Refusing to reset: {refused}."}
+        if demo_seed.is_seeded():
+            result = {"ok": True, "seeded": False,
+                      "message": "Demo data already present; nothing changed."}
+        else:
+            result = {"ok": True, "seeded": True, "counts": demo_seed.seed(event["passwords"])}
+        if event.get("bulk") is True:
+            if demo_bulk.is_seeded():
+                result["bulk"] = {"seeded": False, "message": "Large demo already present; nothing changed."}
+            else:
+                result["bulk"] = {"seeded": True, "counts": demo_bulk.seed(event["passwords"])}
+    except Exception as exc:
+        # Same rule as HTTP requests: only the error type is logged.
+        logger.error("direct invoke seed_demo -> unhandled %s", type(exc).__name__)
+        return {"ok": False, "error": f"Seeding failed ({type(exc).__name__}); see the function's log."}
+    logger.info("direct invoke seed_demo -> seeded=%s bulk=%s", result["seeded"],
+                result["bulk"]["seeded"] if "bulk" in result else None)
+    result["accounts"] = [{"role": role, "email": address} for role, address in demo_seed.accounts()]
+    return result
+
+
 def handler(event=None, context=None):
     """
     Handle one HTTP request for the auth service.
@@ -72,6 +127,8 @@ def handler(event=None, context=None):
     """
     event = event or {}
     audit.ACTOR.set(None)
+    if _is_direct_invoke(event):
+        return _direct_invoke(event)
     method, path = routing.get_route(event, routes.SERVICE_NAME)
     # Log only known routes: an unknown path could contain anything.
     route = path if (method, path) in routes.ROUTES else "(unmatched)"

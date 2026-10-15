@@ -26,6 +26,7 @@ import BudgetFlag from './BudgetFlag'
 import CapacityHeatmap, { HeatLegend } from './heatmap/CapacityHeatmap'
 import { shiftWeek } from './heatmap/heatScale'
 import { Empty, LoadState } from './PageState'
+import Paginated from './Paginated'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
 import { PersonName } from './viz/Avatar'
@@ -76,6 +77,9 @@ export function ProjectStatusReport() {
   )
 }
 
+/** Cards per page for report card lists. */
+const CARD_PAGE_SIZES = [10, 25, 50]
+
 /** 2. At-risk projects with the reasons, as cards. */
 export function AtRiskReport() {
   const load = useCallback((call) => call((token) => reportService.atRiskProjects(token)), [])
@@ -83,8 +87,10 @@ export function AtRiskReport() {
   return (
     <LoadState result={result} label="Loading at-risk projects" skeleton="cards">
       {(data) => (data.projects.length === 0 ? <Empty>No projects are at risk right now.</Empty> : (
+        <Paginated rows={data.projects} label="At-risk projects" pageSize={10} pageSizes={CARD_PAGE_SIZES}>
+        {(projects) => (
         <Stack component="ul" aria-label="At-risk projects" spacing={1.5} sx={{ listStyle: 'none', p: 0, m: 0 }}>
-          {data.projects.map((p) => (
+          {projects.map((p) => (
             <Paper component="li" key={p.id} variant="outlined" sx={{ p: 2 }}>
               <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600 }}>{projectLink(p)}</Typography>
               <Typography variant="body2" color="text.secondary">
@@ -99,6 +105,8 @@ export function AtRiskReport() {
             </Paper>
           ))}
         </Stack>
+        )}
+        </Paginated>
       ))}
     </LoadState>
   )
@@ -134,7 +142,9 @@ export function ResourcesReport() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Hours per week, from the {formatWeek(first)}. “Other projects” is time on projects you can’t see.
             </Typography>
-            <CapacityHeatmap weeks={data.weeks} people={data.people} isPhone={isPhone} />
+            <Paginated rows={data.people} label="People">
+              {(people) => <CapacityHeatmap weeks={data.weeks} people={people} isPhone={isPhone} />}
+            </Paginated>
             <HeatLegend />
           </>
         ))}

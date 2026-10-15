@@ -1,4 +1,4 @@
-"""Integration tests for scripts/seed_demo.py."""
+"""Integration tests for scripts/seed_demo.py and common/demo_seed.py."""
 
 import datetime
 import os
@@ -6,7 +6,7 @@ import os
 import pytest
 
 import seed_demo
-from common import auth, db, weeks
+from common import auth, db, demo_seed, weeks
 
 pytestmark = pytest.mark.integration
 
@@ -149,7 +149,7 @@ def test_hal_has_no_team_and_no_allocations(demo_env):
 
 def test_reset_puts_the_demo_back_as_seeded(demo_env, capsys):
     seed_demo.main([])
-    expected = {name: _count(name) for name in seed_demo._RESET_TABLES if name != "refresh_tokens"}
+    expected = {name: _count(name) for name in demo_seed.RESET_TABLES if name != "refresh_tokens"}
     db.execute("UPDATE projects SET archived_at = now(), name = 'renamed' WHERE name = 'Billing v2'")
     db.execute("INSERT INTO refresh_tokens (employee_id, token_hash, expires_at) "
                "SELECT id, 'x', now() + interval '1 day' FROM employees LIMIT 1")
@@ -181,12 +181,31 @@ def test_seed_leaves_a_believable_history_without_amounts(demo_env):
     seed_demo.main([])
     rows = db.query("SELECT action, details::text AS d, created_at FROM audit_log "
                     "WHERE actor_id IS NOT NULL ORDER BY created_at")
-    assert len(rows) == len(seed_demo.HISTORY)
+    assert len(rows) == len(demo_seed.HISTORY)
     actions = {r["action"] for r in rows}
     assert {"employee_created", "team_created", "project_created", "deliverable_archived",
             "allocation_updated", "employee_salary_changed", "login_success"} <= actions
     assert rows[0]["created_at"] < rows[-1]["created_at"]
-    salaries = [str(salary) for *_, salary in seed_demo.PEOPLE]
+    salaries = [str(salary) for *_, salary in demo_seed.PEOPLE]
     assert not any(s in (r["d"] or "") for r in rows for s in salaries)
     archived = db.query_one("SELECT archived_at FROM deliverables WHERE name = 'Legacy CSV export'")
     assert archived["archived_at"] is not None
+
+
+def test_bulk_adds_the_large_demo_once(demo_env, capsys):
+    assert seed_demo.main(["--bulk"]) == 0
+    assert _count("employees") == 511 and _count("teams") == 32 and _count("projects") == 213
+    out = capsys.readouterr().out
+    assert "Seeded demo:" in out and "Seeded large demo: 500 employees, 30 teams, 210 projects" in out
+    for value in _PASSWORDS.values():
+        assert value not in out
+
+    assert seed_demo.main(["--bulk"]) == 0
+    out = capsys.readouterr().out
+    assert "Demo data already present" in out and "Large demo already present" in out
+    assert _count("employees") == 511
+
+
+def test_without_bulk_the_large_demo_is_left_out(demo_env):
+    assert seed_demo.main([]) == 0
+    assert _count("employees") == 11

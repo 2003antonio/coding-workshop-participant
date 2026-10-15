@@ -12,6 +12,7 @@ import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import Paginated from '../components/Paginated'
 import { useToast } from '../components/toast/toast'
 import { LoadState } from '../components/PageState'
 import { useMotion } from '../components/motion/motion'
@@ -22,6 +23,9 @@ import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { leadCandidates } from './people'
 import { clickableCardSx } from '../theme'
+
+/** Cards per page: rows of a 1-, 2-, 3- or 4-column grid stay full. */
+const TEAM_PAGE_SIZES = [12, 24, 48]
 
 /** One card per team: name, lead (with avatar), and the members as a stack with their count. */
 function TeamCards({ rows, empty }) {
@@ -108,7 +112,9 @@ export default function TeamsPage() {
         )} />
       <LoadState result={teams} label="Loading teams" skeleton="cards">
         {(rows) => (
-          <TeamCards rows={rows} empty={emptyText} />
+          <Paginated rows={rows} label="Teams" pageSize={12} pageSizes={TEAM_PAGE_SIZES}>
+            {(pageRows) => <TeamCards rows={pageRows} empty={emptyText} />}
+          </Paginated>
         )}
       </LoadState>
       {creating && (

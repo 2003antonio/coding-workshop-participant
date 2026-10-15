@@ -1,5 +1,6 @@
 """The Lambda handler: event shape, body limits, errors, logging, cold start."""
 
+import json
 import logging
 
 import pytest
@@ -136,3 +137,131 @@ def test_migrations_run_once_per_cold_start(api, monkeypatch):
     api("GET", "/api/auth/me")
     api("GET", "/api/auth/me")
     assert calls == [1]
+
+
+# =====================================================================
+# Direct invoke: seed_demo (operator only, never through the public URL)
+# =====================================================================
+_SEED_PASSWORDS = {"admin": "Seed-Admin-Pass-1", "manager": "Seed-Manager-Pass-2",
+                   "employee": "Seed-Employee-Pass-3"}
+
+
+def _employee_count():
+    from common import db
+    return db.query_one("SELECT count(*) AS n FROM employees")["n"]
+
+
+def test_direct_invoke_seeds_the_demo_once(migrated_db, caplog):
+    import function
+    from common import auth, db
+
+    caplog.set_level(logging.DEBUG)
+    first = function.handler({"action": "seed_demo", "passwords": _SEED_PASSWORDS}, None)
+    assert first["ok"] is True and first["seeded"] is True
+    assert first["counts"]["employees"] == _employee_count() == 11
+    assert {"role": "admin", "email": "admin@acme-demo.test"} in first["accounts"]
+    admin = db.query_one("SELECT password_hash FROM employees WHERE email = 'admin@acme-demo.test'")
+    assert auth.verify_password(_SEED_PASSWORDS["admin"], admin["password_hash"])
+
+    again = function.handler({"action": "seed_demo", "passwords": _SEED_PASSWORDS}, None)
+    assert again["ok"] is True and again["seeded"] is False
+    assert _employee_count() == 11
+    for secret in _SEED_PASSWORDS.values():
+        assert secret not in caplog.text
+        assert secret not in json.dumps(first) + json.dumps(again)
+
+
+@pytest.mark.parametrize("passwords", [
+    None,
+    "Seed-Admin-Pass-1",
+    {"admin": "Seed-Admin-Pass-1", "manager": "Seed-Manager-Pass-2"},
+    dict(_SEED_PASSWORDS, employee="short"),
+    dict(_SEED_PASSWORDS, manager=123456789012345),
+], ids=["missing", "not-a-map", "role-missing", "too-short", "not-text"])
+def test_direct_invoke_refuses_bad_passwords_and_writes_nothing(migrated_db, passwords):
+    import function
+    result = function.handler({"action": "seed_demo", "passwords": passwords}, None)
+    assert result["ok"] is False and "12 characters" in result["error"]
+    assert _employee_count() == 0
+
+
+def test_direct_invoke_unknown_action_does_nothing(migrated_db):
+    import function
+    result = function.handler({"action": "drop_everything"}, None)
+    assert result == {"ok": False, "error": "Unknown action; the only one is seed_demo."}
+    assert _employee_count() == 0
+
+
+def test_direct_invoke_failure_logs_only_the_error_type(migrated_db, monkeypatch, caplog):
+    import function
+    from common import demo_seed
+
+    def explode(passwords, monday=None):
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(demo_seed, "seed", explode)
+    caplog.set_level(logging.INFO)
+    result = function.handler({"action": "seed_demo", "passwords": _SEED_PASSWORDS}, None)
+    assert result["ok"] is False and "RuntimeError" in result["error"]
+    assert "secret internal detail" not in caplog.text + json.dumps(result)
+    assert "direct invoke seed_demo -> unhandled RuntimeError" in caplog.text
+
+
+@pytest.mark.parametrize("where", ["top-level", "body"])
+def test_function_url_requests_cannot_reach_the_seed(api, lambda_event, where):
+    import function
+    payload = {"action": "seed_demo", "passwords": _SEED_PASSWORDS}
+    if where == "body":
+        resp = api("POST", "/api/auth/", body=payload)
+        status = resp.status
+    else:
+        event = dict(lambda_event("POST", "/api/auth/seed_demo"), **payload)
+        status = function.handler(event, None)["statusCode"]
+    assert status == 404
+    assert _employee_count() == 0
+
+
+def test_direct_invoke_bulk_adds_the_large_demo_once(migrated_db, caplog):
+    import function
+    caplog.set_level(logging.DEBUG)
+    event = {"action": "seed_demo", "passwords": _SEED_PASSWORDS, "bulk": True}
+    first = function.handler(event, None)
+    assert first["ok"] is True and first["seeded"] is True
+    assert first["bulk"]["seeded"] is True and first["bulk"]["counts"]["employees"] == 500
+    assert _employee_count() == 511
+
+    again = function.handler(event, None)
+    assert again["bulk"] == {"seeded": False, "message": "Large demo already present; nothing changed."}
+    assert _employee_count() == 511
+    for secret in _SEED_PASSWORDS.values():
+        assert secret not in caplog.text + json.dumps(first) + json.dumps(again)
+
+
+@pytest.mark.parametrize("flag", [None, False, "true", 1])
+def test_direct_invoke_bulk_needs_literal_true(migrated_db, flag):
+    import function
+    event = {"action": "seed_demo", "passwords": _SEED_PASSWORDS}
+    if flag is not None:
+        event["bulk"] = flag
+    result = function.handler(event, None)
+    assert "bulk" not in result and _employee_count() == 11
+
+
+def test_direct_invoke_reset_starts_the_demo_over(migrated_db):
+    import function
+    from common import db
+    event = {"action": "seed_demo", "passwords": _SEED_PASSWORDS}
+    function.handler(event, None)
+    db.execute("UPDATE projects SET name = 'renamed' WHERE name = 'Billing v2'")
+    result = function.handler(dict(event, reset=True), None)
+    assert result["ok"] is True and result["seeded"] is True and _employee_count() == 11
+    assert db.query_one("SELECT count(*) AS n FROM projects WHERE name = 'Billing v2'")["n"] == 1
+
+
+def test_direct_invoke_reset_refuses_when_real_accounts_exist(migrated_db, make_employee):
+    import function
+    make_employee()  # an account outside the demo domain
+    result = function.handler({"action": "seed_demo", "passwords": _SEED_PASSWORDS, "reset": True}, None)
+    assert result == {"ok": False, "error": "Refusing to reset: the database has 1 account(s) "
+                                            "outside @acme-demo.test."}
+    assert _employee_count() == 1
