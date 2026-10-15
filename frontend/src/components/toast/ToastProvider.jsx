@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
+import Portal from '@mui/material/Portal'
 import Snackbar from '@mui/material/Snackbar'
 import { ToastContext } from './toast'
 
@@ -31,14 +32,20 @@ export default function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <Snackbar key={current?.key} open={open && Boolean(current)} autoHideDuration={TOAST_MS} onClose={handleClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 'calc(24px + env(safe-area-inset-bottom, 0px))', sm: 24 } }}>
-        <Alert severity="success" variant="filled" role="status" aria-live="polite" onClose={() => setOpen(false)}
-          closeText="Dismiss" sx={{ minWidth: { sm: 280 }, maxWidth: 480, boxShadow: 3, fontWeight: 500 }}>
-          {current?.message}
-        </Alert>
-      </Snackbar>
+      {/* A fresh portal per toast (key), added to <body> after any open dialog, so the dialog's
+          aria-hidden on the rest of the page does not hide the toast from screen readers. */}
+      {current && (
+        <Portal key={current.key}>
+          <Snackbar open={open} autoHideDuration={TOAST_MS} onClose={handleClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            sx={{ bottom: { xs: 'calc(24px + env(safe-area-inset-bottom, 0px))', sm: 24 } }}>
+            <Alert severity="success" variant="filled" role="status" aria-live="polite" onClose={() => setOpen(false)}
+              closeText="Dismiss" sx={{ minWidth: { sm: 280 }, maxWidth: 480, boxShadow: 3, fontWeight: 500 }}>
+              {current.message}
+            </Alert>
+          </Snackbar>
+        </Portal>
+      )}
     </ToastContext.Provider>
   )
 }

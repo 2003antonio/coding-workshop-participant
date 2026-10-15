@@ -8,6 +8,10 @@ import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
 import { MASK, REVEAL_MS } from '../components/reveal'
 import { fakeAuthServer, reply } from '../test/fakeAuthServer'
 
+// The temporary password is random in the app; tests use a fixed stand-in.
+const STUB_PASSWORD = 'Stub-Temp-Pass-16'
+vi.mock('../components/tempPassword', () => ({ generatePassword: () => STUB_PASSWORD }))
+
 const USERS = {
   admin: { id: 'u-1', email: 'ada@acme.test', name: 'Ada Admin', role: 'admin', job_title: 'Head of Ops' },
   manager: { id: 'u-2', email: 'max@acme.test', name: 'Max Manager', role: 'manager', job_title: 'Delivery Lead' },
@@ -213,7 +217,7 @@ describe('admin actions', () => {
     // Empty form: errors shown next to the fields, nothing sent.
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
     expect(within(dialog).getByText('Enter a name.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Use at least 12 characters.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Generate a temporary password first.')).toBeInTheDocument()
     expect(within(dialog).getByRole('textbox', { name: /name/i })).toHaveAttribute('aria-invalid', 'true')
     expect(server.count('POST', '/api/employees/')).toBe(0)
 
@@ -223,7 +227,7 @@ describe('admin actions', () => {
     await user.click(within(dialog).getByRole('combobox', { name: /role/i }))
     await user.click(await screen.findByRole('option', { name: 'Manager' }))
     await user.type(within(dialog).getByRole('textbox', { name: /salary/i }), '70000.5')
-    await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
+    await user.click(within(dialog).getByRole('button', { name: 'Generate temporary password' }))
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
     expect(await screen.findByText('Employee added: Nia New')).toBeInTheDocument()
@@ -231,7 +235,7 @@ describe('admin actions', () => {
     const post = server.calls.find((c) => c.method === 'POST' && c.path === '/api/employees/')
     expect(post.body).toEqual({
       name: 'Nia New', email: 'nia@acme.test', job_title: 'Analyst', role: 'manager',
-      salary: 70000.5, password: 'Initial-Pass-2024',
+      salary: 70000.5, password: STUB_PASSWORD,
     })
     await waitFor(() => expect(server.count('GET', '/api/employees/')).toBe(2))
   })
@@ -250,7 +254,7 @@ describe('admin actions', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /email/i }), 'EVE@acme.test')
     await user.type(within(dialog).getByRole('textbox', { name: /job title/i }), 'Engineer')
     await user.type(within(dialog).getByRole('textbox', { name: /salary/i }), '1')
-    await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
+    await user.click(within(dialog).getByRole('button', { name: 'Generate temporary password' }))
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
     expect(await within(dialog).findByText('An employee with that email already exists.')).toBeInTheDocument()
@@ -383,7 +387,7 @@ describe('salary click-to-reveal (admin)', () => {
     expect(dialog).not.toHaveTextContent(/90000|90,000/)
     await user.click(within(dialog).getByRole('button', { name: 'Show salary for Eve Employee' }))
     const salary = within(dialog).getByRole('textbox', { name: /salary/i })
-    expect(salary).toHaveValue('90000.5')
+    expect(salary).toHaveValue('90,000.5') // shown with separators; sent as a number
     await user.clear(salary)
     await user.type(salary, '95000')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))

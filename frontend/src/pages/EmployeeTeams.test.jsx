@@ -1,9 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { choose, renderApp, rowFor } from '../test/renderApp'
 import { teamLabel } from './people'
+
+// The temporary password is random in the app; tests use a fixed stand-in.
+vi.mock('../components/tempPassword', () => ({ generatePassword: () => 'Stub-Temp-Pass-16' }))
 
 const table = () => screen.findByRole('table', { name: 'Employees' })
 const teamCell = (name) => within(rowFor(name)).getAllByRole('cell')[2] // email, job title, team
@@ -29,7 +32,7 @@ describe('Employees page: teams', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /job title/i }), 'Engineer')
     await choose(user, /team/i, 'Data', dialog)
     await user.type(within(dialog).getByRole('textbox', { name: /salary/i }), '80000')
-    await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
+    await user.click(within(dialog).getByRole('button', { name: 'Generate temporary password' }))
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
     expect(await screen.findByText('Employee added: Kai Kim')).toBeInTheDocument()
