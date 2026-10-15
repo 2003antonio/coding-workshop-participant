@@ -10,6 +10,9 @@ import { useApi, useLoad } from '../auth/useApi'
 import { useProjectRefresh } from './projectRefresh'
 import { useToast } from './toast/toast'
 import * as allocationService from '../services/allocationService'
+import * as projectService from '../services/projectService'
+import { localToday } from './home/homeMath'
+import { assignedSummary, stillAssigned } from './projectClose'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { formatDate, formatMoney } from '../pages/format'
@@ -196,6 +199,20 @@ export default function AllocationsSection({ project, canEdit, role }) {
   }
 
   const closed = Boolean(project.archived_at) || project.status === 'completed'
+  // A closed project with people still on it: the server refuses to change those assignments
+  // now, so the way out is to reopen the project (then close it with "end their assignments").
+  const leftOver = canEdit && project.status === 'completed' ? stillAssigned(result.data ?? [], localToday()) : []
+
+  async function reopen() {
+    setProblem('')
+    try {
+      await api((token) => projectService.updateProject(token, project.id, { status: 'active' }))
+      toast('Project reopened')
+      refresh()
+    } catch (error) {
+      setProblem(messageFor(error))
+    }
+  }
 
   return (
     <Box>
@@ -212,6 +229,16 @@ export default function AllocationsSection({ project, canEdit, role }) {
         </Typography>
       )}
       {problem && <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>}
+      {leftOver.length > 0 && (() => {
+        const { people: count, hours } = assignedSummary(leftOver)
+        return (
+          <Alert severity="warning" sx={{ mb: 2 }}
+            action={<Button color="inherit" size="small" onClick={reopen}>Reopen project</Button>}>
+            This project is closed but {count} {count === 1 ? 'person is' : 'people are'} still assigned ({hours} h per
+            week). Reopen it to end their assignments.
+          </Alert>
+        )
+      })()}
       {people.status === 'error' && <Alert severity="warning" sx={{ mb: 2 }}>{people.error}</Alert>}
       <LoadState result={result} label="Loading assignments" skeleton="table">
         {(rows) => (

@@ -31,6 +31,18 @@ export function Updating() {
  * words with $ amounts. Hidden totals say "Hidden", never 0. `bare` leaves out
  * its own "Budget" label (the health strip tile has one).
  */
+/**
+ * A closed (completed) project's budget in one line: "Final cost $X of $Y planned, $Z under"
+ * ("over" when above). Only when the server sent the numbers: a hidden budget stays "Hidden".
+ */
+function finalCost(project, budget) {
+  if (project.status !== 'completed' || budget.committed_cost === null || budget.committed_cost === undefined) return null
+  if (budget.planned_budget === null || budget.planned_budget === undefined) return `Final cost ${formatMoney(budget.committed_cost)}`
+  const gap = budget.planned_budget - budget.committed_cost
+  return `Final cost ${formatMoney(budget.committed_cost)} of ${formatMoney(budget.planned_budget)} planned, `
+    + `${formatMoney(Math.abs(gap))} ${gap >= 0 ? 'under' : 'over'}`
+}
+
 export function ProjectBudgetBar({ project, bare = false }) {
   const load = useCallback(
     (call) => call((token) => budgetService.getProjectBudget(token, project.id)),
@@ -54,11 +66,14 @@ export function ProjectBudgetBar({ project, bare = false }) {
   return (
     <Box component="section" aria-label="Budget summary" aria-busy={result.updating}
       sx={{ maxWidth: bare ? 'none' : 440, opacity: result.updating ? 0.7 : 1, transition: 'opacity 150ms' }}>
-      <BudgetBar budget={result.data} name={bare ? (result.updating && <Updating />) : (
+      <BudgetBar budget={result.data} words={!finalCost(project, result.data)} name={bare ? (result.updating && <Updating />) : (
         <Typography variant="subtitle2" component="span">
           Budget{result.updating && <Updating />}
         </Typography>
       )} />
+      {finalCost(project, result.data) && (
+        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600 }}>{finalCost(project, result.data)}</Typography>
+      )}
     </Box>
   )
 }
