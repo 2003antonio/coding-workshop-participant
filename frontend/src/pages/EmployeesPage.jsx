@@ -32,9 +32,18 @@ import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { messageFor as teamMessageFor } from './apiMessages'
 import { messageFor } from './employeeMessages'
-import { teamName } from './people'
+import { teamLabel } from './people'
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
+/** The Team column: a member's team, "Leads <team>" for a lead (filled, secondary colour), or a grey "No team". */
+function TeamChip({ label, kind }) {
+  if (kind === 'lead') return <Chip size="small" color="secondary" variant="outlined" label={label} sx={{ fontWeight: 600 }} />
+  return (
+    <Chip size="small" variant="outlined" label={label}
+      sx={{ fontWeight: 500, color: kind === 'member' ? 'text.primary' : 'text.secondary' }} />
+  )
+}
+
 /** Role chips: outlined, so they never read as a status; the label says the role. */
 const ROLE_COLORS = { admin: 'primary', manager: 'secondary', employee: 'default' }
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -226,7 +235,7 @@ export default function EmployeesPage() {
                         <Typography variant="body2" color="text.secondary">
                           {employee.job_title}
                           <br />
-                          {teamName(employee.team_id, teams ?? [])}
+                          {teamLabel(employee, teams ?? []).label}
                           <br />
                           {employee.email}
                         </Typography>
@@ -236,8 +245,7 @@ export default function EmployeesPage() {
                     {!isPhone && <TableCell>{employee.job_title}</TableCell>}
                     {!isPhone && (
                       <TableCell>
-                        <Chip size="small" variant="outlined" label={teamName(employee.team_id, teams ?? [])}
-                          sx={{ fontWeight: 500, color: employee.team_id ? 'text.primary' : 'text.secondary' }} />
+                        <TeamChip {...teamLabel(employee, teams ?? [])} />
                       </TableCell>
                     )}
                     <TableCell>

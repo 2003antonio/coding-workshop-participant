@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { choose, renderApp, rowFor } from '../test/renderApp'
+import { teamLabel } from './people'
 
 const table = () => screen.findByRole('table', { name: 'Employees' })
 const teamCell = (name) => within(rowFor(name)).getAllByRole('cell')[2] // email, job title, team
@@ -186,5 +187,26 @@ describe('Employees: row look', () => {
     expect(row.querySelector('[data-initials="EE"]')).toHaveAttribute('aria-hidden', 'true')
     expect(within(row).getByText('Employee').closest('.MuiChip-root')).toBeInTheDocument()
     await waitFor(() => expect(within(row).getByText('Platform').closest('.MuiChip-root')).toBeInTheDocument())
+  })
+})
+
+describe('Employees: leads show their team', () => {
+  it('a lead shows "Leads <team>"; someone with no team and nothing to lead keeps "No team"', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/employees')
+    await table()
+    await waitFor(() => expect(teamCell('Max Manager')).toHaveTextContent('Leads Platform'))
+    expect(teamCell('Mia Manager')).toHaveTextContent('Leads Data')
+    expect(teamCell('Nia New')).toHaveTextContent('No team')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Max Manager' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Leads Platform. A lead is not a member of the team they lead.')).toBeInTheDocument()
+  })
+
+  it('teamLabel counts further teams as "+N"', () => {
+    const teams = [{ id: 't-1', name: 'Platform', lead: { id: 'u-2' } }, { id: 't-2', name: 'Data', lead: { id: 'u-2' } }]
+    expect(teamLabel({ id: 'u-2', team_id: null }, teams)).toEqual({ label: 'Leads Platform +1', kind: 'lead' })
+    expect(teamLabel({ id: 'u-9', team_id: 't-2' }, teams)).toEqual({ label: 'Data', kind: 'member' })
   })
 })

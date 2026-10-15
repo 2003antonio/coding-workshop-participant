@@ -16,3 +16,19 @@ export function teamName(teamId, teams) {
   if (!teamId) return 'No team'
   return teams.find((t) => t.id === teamId)?.name ?? 'Other team'
 }
+
+/** The active teams this person leads, from a team list (a lead is never a member of their own team). */
+export const ledTeams = (employeeId, teams) => teams.filter((t) => !t.archived_at && t.lead?.id === employeeId)
+
+/**
+ * What the Team column says about someone: their team as a member, else
+ * "Leads Platform" (and "+1" for each further team they lead), else "No team".
+ * -> { label, kind: 'member' | 'lead' | 'none' }
+ */
+export function teamLabel(employee, teams) {
+  if (employee.team_id) return { label: teamName(employee.team_id, teams), kind: 'member' }
+  const led = ledTeams(employee.id, teams)
+  if (led.length === 0) return { label: 'No team', kind: 'none' }
+  const more = led.length > 1 ? ` +${led.length - 1}` : ''
+  return { label: `Leads ${led[0].name}${more}`, kind: 'lead' }
+}

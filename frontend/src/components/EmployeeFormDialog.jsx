@@ -11,6 +11,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useMediaQuery } from 'react-responsive'
 import { messageFor } from '../pages/employeeMessages'
+import { ledTeams } from '../pages/people'
 import { RevealButton } from './MaskedMoney'
 import { MASK, useReveal } from './reveal'
 
@@ -73,6 +74,14 @@ function validate(values, isCreate, checkSalary = true) {
  *   the employee record: the caller changes it through /api/teams/{id}/members.
  * `teams` are the active teams to offer; null if they could not be loaded.
  */
+/** Under the Team field: why it can't change, or that a lead leads (and is not a member of) their team. */
+function teamHelp(employee, teams) {
+  if (teams === null) return "Teams couldn't be loaded, so the team can't be changed now."
+  const led = employee ? ledTeams(employee.id, teams) : []
+  if (led.length === 0) return ' '
+  return `Leads ${led.map((t) => t.name).join(', ')}. A lead is not a member of the team they lead.`
+}
+
 export default function EmployeeFormDialog({ employee, teams = null, onClose, onSubmit }) {
   const isCreate = !employee
   const isPhone = useMediaQuery({ maxWidth: 599 })
@@ -136,7 +145,7 @@ export default function EmployeeFormDialog({ employee, teams = null, onClose, on
             ))}
           </TextField>
           <TextField select label="Team" {...field('team_id')} disabled={teams === null}
-            helperText={teams === null ? "Teams couldn't be loaded, so the team can't be changed now." : ' '}>
+            helperText={teamHelp(employee, teams)}>
             <MenuItem value="">No team</MenuItem>
             {(teams ?? [])
               // A lead is never a member of the team they lead.
