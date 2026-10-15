@@ -67,7 +67,7 @@ const light = {
   background: { default: '#F4F6F9', paper: '#FFFFFF' },
   text: { primary: '#132B45', secondary: '#4A5566' },
   divider: '#DDE3EA',
-  sidebar: { bg: BRAND.navy, fg: '#D6E1EE', active: 'rgba(255, 255, 255, 0.12)', accent: '#5CC8D3' },
+  sidebar: { bg: BRAND.navy, fg: '#D6E1EE', active: 'rgba(255, 255, 255, 0.12)', accent: '#5CC8D3', edge: BRAND.navy },
   status: STATUS_COLORS.light,
 }
 
@@ -81,7 +81,7 @@ const dark = {
   background: { default: '#0B1624', paper: '#13233A' },
   text: { primary: '#E6EDF5', secondary: '#A9B6C6' },
   divider: '#24364F',
-  sidebar: { bg: '#061A2E', fg: '#C9D6E5', active: 'rgba(255, 255, 255, 0.10)', accent: '#5CC8D3' },
+  sidebar: { bg: '#03101F', fg: '#C9D6E5', active: 'rgba(255, 255, 255, 0.10)', accent: '#5CC8D3', edge: '#2B4566' },
   status: STATUS_COLORS.dark,
 }
 

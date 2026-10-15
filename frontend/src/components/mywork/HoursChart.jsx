@@ -46,29 +46,35 @@ function Legend({ projects, hasOther }) {
   )
 }
 
-/** The same numbers as a table, for screen readers. */
+/**
+ * The same numbers as a table, for screen readers. A <table> ignores a 1 px
+ * width and grows to fit its cells, so the clipping box wraps it (otherwise the
+ * page scrolls sideways on a phone).
+ */
 function HiddenTable({ weeks, projects, hasOther }) {
   return (
-    <Box component="table" sx={visuallyHidden}>
-      <caption>Hours per week, from the {formatWeek(weeks[0]?.week_start)}</caption>
-      <thead>
-        <tr>
-          <th scope="col">Week</th>
-          {projects.map((p) => <th key={p.id} scope="col">{p.name}</th>)}
-          {hasOther && <th scope="col">Other projects</th>}
-          <th scope="col">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {weeks.map((w) => (
-          <tr key={w.week_start}>
-            <th scope="row">{formatWeek(w.week_start)}</th>
-            {projects.map((p) => <td key={p.id}>{w.projects.find((x) => x.id === p.id)?.hours ?? 0} h</td>)}
-            {hasOther && <td>{w.other_hours} h</td>}
-            <td>{w.total_hours} h{w.total_hours > NEAR_CAPACITY_HOURS ? ', near capacity' : ''}</td>
+    <Box sx={visuallyHidden}>
+      <table>
+        <caption>Hours per week, from the {formatWeek(weeks[0]?.week_start)}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Week</th>
+            {projects.map((p) => <th key={p.id} scope="col">{p.name}</th>)}
+            {hasOther && <th scope="col">Other projects</th>}
+            <th scope="col">Total</th>
           </tr>
-        ))}
-      </tbody>
+        </thead>
+        <tbody>
+          {weeks.map((w) => (
+            <tr key={w.week_start}>
+              <th scope="row">{formatWeek(w.week_start)}</th>
+              {projects.map((p) => <td key={p.id}>{w.projects.find((x) => x.id === p.id)?.hours ?? 0} h</td>)}
+              {hasOther && <td>{w.other_hours} h</td>}
+              <td>{w.total_hours} h{w.total_hours > NEAR_CAPACITY_HOURS ? ', near capacity' : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Box>
   )
 }

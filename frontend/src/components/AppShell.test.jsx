@@ -1,8 +1,9 @@
 import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { signedInAs } from '../test/fakeApiServer'
 import { renderApp } from '../test/renderApp'
 import { sectionTitle } from '../navigation'
+import { COLLAPSE_KEY, RAIL_WIDTH } from './AppShell'
 
 describe('AppShell', () => {
   it('shows the sidebar links for the role, marks the current one, and names who is signed in', async () => {
@@ -63,6 +64,63 @@ describe('AppShell', () => {
     await screen.findByRole('heading', { name: /welcome/i })
     expect(within(screen.getByRole('banner')).queryByText('Ada Admin')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  })
+})
+
+describe('AppShell: collapsible sidebar', () => {
+  it('collapses to an icon rail and back; the links keep their names', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/projects')
+    await screen.findByRole('heading', { level: 1, name: 'Projects' })
+    const collapse = screen.getByRole('button', { name: 'Collapse sidebar' })
+    expect(collapse).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(collapse)
+    const expand = screen.getByRole('button', { name: 'Expand sidebar' })
+    expect(expand).toHaveAttribute('aria-expanded', 'false')
+    expect(window.localStorage.getItem(COLLAPSE_KEY)).toBe('true')
+    // Collapsed, every link still has its accessible name (the text is only hidden visually).
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent))
+      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Employees'])
+    expect(within(nav).getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('sidebar').parentElement).toHaveStyle({ width: `${RAIL_WIDTH}px` })
+
+    await user.click(expand)
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
+    expect(window.localStorage.getItem(COLLAPSE_KEY)).toBe('false')
+  })
+
+  it('remembers the collapsed choice on the next visit', async () => {
+    window.localStorage.setItem(COLLAPSE_KEY, 'true')
+    signedInAs('employee')
+    renderApp('/')
+    await screen.findByRole('heading', { name: /welcome/i })
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('still works when the browser blocks storage', async () => {
+    signedInAs('employee')
+    // Only the sidebar's key is blocked, so signing in still works.
+    const store = window.localStorage
+    const blocked = (original) => (key, ...rest) => {
+      if (key === COLLAPSE_KEY) throw new Error('blocked')
+      return original(key, ...rest)
+    }
+    vi.spyOn(store, 'getItem').mockImplementation(blocked(store.getItem.bind(store)))
+    vi.spyOn(store, 'setItem').mockImplementation(blocked(store.setItem.bind(store)))
+    const { user } = renderApp('/')
+    await screen.findByRole('heading', { name: /welcome/i })
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
+  })
+
+  it('has no collapse button below 900 px, where "Menu" opens the drawer', async () => {
+    signedInAs('admin')
+    renderApp('/', { width: 700 })
+    await screen.findByRole('heading', { name: /welcome/i })
+    expect(screen.queryByRole('button', { name: /sidebar/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument()
   })
 })
 
