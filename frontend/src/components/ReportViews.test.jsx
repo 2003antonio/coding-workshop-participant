@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { choose, headersOf, renderApp } from '../test/renderApp'
@@ -60,5 +60,22 @@ describe('Resources report: week columns carry the year', () => {
     const weeks = headersOf('Resource allocation').slice(1)
     expect(weeks.slice(0, 2)).toEqual(['Dec 28 ’26', 'Jan 4 ’27'])
     expect(screen.getByText(/from the week of Dec 28, 2026\./)).toBeInTheDocument()
+  })
+})
+
+describe('Deliverables report: flags use the theme status colours', () => {
+  it('Overdue and Blocked chips use the overdue and blocked status colours, not the general palette', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/reports')
+    await user.click(await screen.findByRole('tab', { name: 'Deliverables' }))
+    const table = await screen.findByRole('table', { name: 'Deliverable status' })
+    const chip = (label) => within(table).getByText(label).closest('.MuiChip-root')
+    for (const [label, tone] of [['Overdue', 'overdue'], ['Blocked', 'blocked']]) {
+      const style = getComputedStyle(chip(label))
+      expect(style.color).toBe(`var(--mui-palette-status-${tone}-fg)`)
+      expect(style.backgroundColor).toBe(`var(--mui-palette-status-${tone}-bg)`)
+      expect(chip(label)).not.toHaveClass('MuiChip-colorError')
+      expect(chip(label)).not.toHaveClass('MuiChip-colorWarning')
+    }
   })
 })

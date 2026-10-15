@@ -21,6 +21,7 @@ import {
   RISK_REASONS, formatDate, formatMoney, formatPercent, formatWeek, formatWeekShort, hiddenMessage,
 } from '../pages/format'
 import { useBreakpoint } from '../hooks/useBreakpoint'
+import { toneSx } from '../theme'
 import BudgetFlag from './BudgetFlag'
 import CapacityHeatmap, { HeatLegend } from './heatmap/CapacityHeatmap'
 import { shiftWeek } from './heatmap/heatScale'
@@ -153,8 +154,8 @@ export function DeliverablesReport() {
               { key: 'due', label: 'Due', render: (d) => formatDate(d.due_date) },
               { key: 'flags', label: 'Flags', render: (d) => (
                 <Box component="span" sx={{ display: 'inline-flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {d.overdue && <Chip size="small" color="error" label="Overdue" />}
-                  {d.blocked && <Chip size="small" color="warning" label="Blocked" />}
+                  {d.overdue && <Chip size="small" label="Overdue" sx={toneSx('overdue')} />}
+                  {d.blocked && <Chip size="small" label="Blocked" sx={toneSx('blocked')} />}
                   {!d.overdue && !d.blocked && '—'}
                 </Box>
               ) },
