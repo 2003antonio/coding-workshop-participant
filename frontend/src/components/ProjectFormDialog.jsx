@@ -3,6 +3,7 @@ import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import { PROJECT_STATUS } from '../pages/format'
 import FormDialog from './FormDialog'
+import { datesConflicts } from './projectDates'
 
 const MAX_NAME = 200
 const MAX_DESCRIPTION = 2000
@@ -30,8 +31,10 @@ function parseBudget(text) {
  *   teams: the teams the caller may pick; canChangeTeam: false keeps the team fixed
  *   create: onSubmit({ team_id, name, description, status, start_date, end_date, planned_budget? })
  *   edit:   onSubmit({ ...only the changed fields })
+ *   contents (edit): { deliverables, allocations } already loaded; changed dates that would leave
+ *   one of them outside are refused here with a sentence naming up to 3 (the server checks too).
  */
-export default function ProjectFormDialog({ project, teams, canChangeTeam = true, onClose, onSubmit }) {
+export default function ProjectFormDialog({ project, teams, canChangeTeam = true, contents, onClose, onSubmit }) {
   const isCreate = !project
   const [values, setValues] = useState(() => ({
     team_id: project?.team.id ?? (teams.length === 1 ? teams[0].id : ''),
@@ -63,6 +66,12 @@ export default function ProjectFormDialog({ project, teams, canChangeTeam = true
     if (!values.start_date) found.start_date = 'Choose a start date.'
     if (!values.end_date) found.end_date = 'Choose an end date.'
     else if (values.start_date && values.end_date < values.start_date) found.end_date = 'End on or after the start date.'
+    const datesChanged = !isCreate && (values.start_date !== project.start_date || values.end_date !== project.end_date)
+    if (datesChanged && contents && !found.start_date && !found.end_date) {
+      const clash = datesConflicts(values.start_date, values.end_date, contents.deliverables, contents.allocations)
+      if (clash.start) found.start_date = clash.start
+      if (clash.end) found.end_date = clash.end
+    }
     const budget = parseBudget(values.planned_budget)
     if (budget.error) found.planned_budget = budget.error
     setErrors(found)

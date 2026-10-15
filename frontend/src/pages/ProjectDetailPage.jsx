@@ -29,6 +29,7 @@ import StatusChip from '../components/StatusChip'
 import { useMotion } from '../components/motion/motion'
 import { useToast } from '../components/toast/toast'
 import DependenciesSection from '../components/timeline/DependenciesSection'
+import * as allocationService from '../services/allocationService'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { formatDate } from './format'
@@ -59,6 +60,16 @@ export default function ProjectDetailPage() {
     [role],
   )
   const teams = useLoad(loadTeams)
+  // What the Edit dialog checks new dates against (loaded only while it is open).
+  const loadContents = useCallback(async (call) => {
+    if (!editing) return null
+    const [deliverables, allocations] = await Promise.all([
+      call((token) => projectService.listDeliverables(token, id)),
+      call((token) => allocationService.listAllocations(token, { projectId: id })),
+    ])
+    return { deliverables, allocations }
+  }, [editing, id])
+  const contents = useLoad(loadContents)
 
   async function handleEdit(changes) {
     if (Object.keys(changes).length) {
@@ -138,7 +149,8 @@ export default function ProjectDetailPage() {
 
                 {editing && (
                   <ProjectFormDialog project={project} canChangeTeam={role === 'admin' && Boolean(teams.data)}
-                    teams={teams.data ?? [project.team]} onClose={() => setEditing(false)} onSubmit={handleEdit} />
+                    teams={teams.data ?? [project.team]} contents={contents.data ?? undefined}
+                    onClose={() => setEditing(false)} onSubmit={handleEdit} />
                 )}
                 {archiving && (
                   <ConfirmDialog title={`Archive ${project.name}?`}
