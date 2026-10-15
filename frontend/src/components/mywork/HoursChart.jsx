@@ -36,11 +36,11 @@ function Legend({ projects, hasOther }) {
       ))}
       <Box component="li" sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box aria-hidden="true" sx={{ width: 14, borderTop: 2, borderStyle: 'dashed', borderColor: 'text.secondary' }} />
-        <Typography variant="body2">{NEAR_CAPACITY_HOURS} h</Typography>
+        <Typography variant="body2">{NEAR_CAPACITY_HOURS} h = near capacity</Typography>
       </Box>
       <Box component="li" sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box aria-hidden="true" sx={{ width: 14, borderTop: 2, borderColor: 'text.primary' }} />
-        <Typography variant="body2">{MAX_HOURS} h limit</Typography>
+        <Typography variant="body2">{MAX_HOURS} h = weekly limit</Typography>
       </Box>
     </Box>
   )

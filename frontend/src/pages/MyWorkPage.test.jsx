@@ -37,7 +37,7 @@ describe('My work page', () => {
     expect(within(chart).getByText('Nov 9 ’26')).toBeInTheDocument()
     expect(within(chart).getByText('Jan 25 ’27')).toBeInTheDocument()
     expect(within(chart).getAllByText('Over 32 h')).toHaveLength(1)
-    expect(screen.getByRole('list', { name: 'Projects in the chart' })).toHaveTextContent('Billing v2Data Lake32 h40 h limit')
+    expect(screen.getByRole('list', { name: 'Projects in the chart' })).toHaveTextContent('Billing v2Data Lake32 h = near capacity40 h = weekly limit')
   })
 
   it('lists Eve’s assignments with project, hours per week and dates', async () => {
