@@ -23,12 +23,18 @@ export const ledTeams = (employeeId, teams) => teams.filter((t) => !t.archived_a
 /**
  * What the Team column says about someone: their team as a member, else
  * "Leads Platform" (and "+1" for each further team they lead), else "No team".
- * -> { label, kind: 'member' | 'lead' | 'none' }
+ * `allTeams` is false when the list holds only some teams (a manager sees the
+ * teams they lead): then a manager or admin who leads none of those may lead
+ * another, so it says "—" instead of a wrong "No team".
+ * -> { label, kind: 'member' | 'lead' | 'none' | 'unknown' }
  */
-export function teamLabel(employee, teams) {
+export function teamLabel(employee, teams, allTeams = true) {
   if (employee.team_id) return { label: teamName(employee.team_id, teams), kind: 'member' }
   const led = ledTeams(employee.id, teams)
-  if (led.length === 0) return { label: 'No team', kind: 'none' }
+  if (led.length === 0) {
+    if (!allTeams && employee.role !== 'employee') return { label: '—', kind: 'unknown' }
+    return { label: 'No team', kind: 'none' }
+  }
   const more = led.length > 1 ? ` +${led.length - 1}` : ''
   return { label: `Leads ${led[0].name}${more}`, kind: 'lead' }
 }

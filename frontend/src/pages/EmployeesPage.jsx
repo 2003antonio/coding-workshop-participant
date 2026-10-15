@@ -17,6 +17,7 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { useMediaQuery } from 'react-responsive'
 import { EMPLOYEE_LIST_ROLES, canManageEmployees } from '../auth/roles'
@@ -37,6 +38,13 @@ import { teamLabel } from './people'
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
 /** The Team column: a member's team, "Leads <team>" for a lead (filled, secondary colour), or a grey "No team". */
 function TeamChip({ label, kind }) {
+  if (kind === 'unknown') {
+    return (
+      <Tooltip title="You can only see the teams you lead.">
+        <Typography component="span" color="text.secondary" tabIndex={0}>{label}</Typography>
+      </Tooltip>
+    )
+  }
   if (kind === 'lead') return <Chip size="small" color="secondary" variant="outlined" label={label} sx={{ fontWeight: 600 }} />
   return (
     <Chip size="small" variant="outlined" label={label}
@@ -235,7 +243,7 @@ export default function EmployeesPage() {
                         <Typography variant="body2" color="text.secondary">
                           {employee.job_title}
                           <br />
-                          {teamLabel(employee, teams ?? []).label}
+                          {teamLabel(employee, teams ?? [], isAdmin).label}
                           <br />
                           {employee.email}
                         </Typography>
@@ -245,7 +253,7 @@ export default function EmployeesPage() {
                     {!isPhone && <TableCell>{employee.job_title}</TableCell>}
                     {!isPhone && (
                       <TableCell>
-                        <TeamChip {...teamLabel(employee, teams ?? [])} />
+                        <TeamChip {...teamLabel(employee, teams ?? [], isAdmin)} />
                       </TableCell>
                     )}
                     <TableCell>

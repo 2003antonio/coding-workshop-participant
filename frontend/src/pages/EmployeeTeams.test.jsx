@@ -170,7 +170,7 @@ describe('access rules', () => {
     await user.click(screen.getByRole('button', { name: 'Menu' }))
     const nav = await screen.findByRole('navigation', { name: 'Main' })
     expect(within(nav).getAllByRole('link').map((m) => m.textContent))
-      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Employees'])
+      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Activity', 'Employees'])
     await user.click(within(nav).getByRole('link', { name: 'Projects' }))
     expect(await screen.findByRole('heading', { name: 'Projects' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument())
@@ -208,5 +208,8 @@ describe('Employees: leads show their team', () => {
     const teams = [{ id: 't-1', name: 'Platform', lead: { id: 'u-2' } }, { id: 't-2', name: 'Data', lead: { id: 'u-2' } }]
     expect(teamLabel({ id: 'u-2', team_id: null }, teams)).toEqual({ label: 'Leads Platform +1', kind: 'lead' })
     expect(teamLabel({ id: 'u-9', team_id: 't-2' }, teams)).toEqual({ label: 'Data', kind: 'member' })
+    // A manager's list has only their own teams: another manager may lead one they can't see.
+    expect(teamLabel({ id: 'u-6', role: 'manager', team_id: null }, teams, false)).toEqual({ label: '—', kind: 'unknown' })
+    expect(teamLabel({ id: 'u-8', role: 'employee', team_id: null }, teams, false).label).toBe('No team')
   })
 })
