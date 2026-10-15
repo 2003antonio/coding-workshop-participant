@@ -21,6 +21,9 @@ export default defineConfig({
     // The longest form tests type every key; under coverage they take ~4.5 s
     // alone and more while other test runs share the CPU. 5 s was too tight.
     testTimeout: 15000,
+    // At most 3 test files at once (Vitest 4+ top-level option): more workers
+    // starve each other on a laptop and the slow form tests time out.
+    maxWorkers: 3,
     // e2e/ holds the Playwright tests (npm run e2e), not Vitest ones.
     exclude: [...configDefaults.exclude, 'e2e/**'],
     // `npm run coverage` fails if any total drops below 80%.
