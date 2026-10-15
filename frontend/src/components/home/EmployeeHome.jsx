@@ -31,6 +31,7 @@ import RingGauge from '../viz/RingGauge'
 import StatusBar from '../viz/StatusBar'
 import { DUE_SOON_DAYS, hoursThisWeek, localToday, myProjects, nextDeadline, weeksFrom } from './homeMath'
 import WeekStrip from './WeekStrip'
+import { clickableCardSx } from '../../theme'
 
 const projectPath = (id) => `/projects/${encodeURIComponent(id)}`
 
@@ -44,7 +45,7 @@ const stretched = {
 }
 const cardSx = {
   p: 2, position: 'relative', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1,
-  transition: 'border-color 150ms', '&:hover': { borderColor: 'primary.main' },
+  ...clickableCardSx,
   '&:focus-within': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
 }
 

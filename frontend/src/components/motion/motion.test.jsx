@@ -70,7 +70,7 @@ describe('what moves on screen', () => {
     const { user } = renderApp('/projects/p-1')
     await screen.findByRole('table', { name: 'Deliverables' })
     const page = screen.getByTestId('page-transition')
-    expect(animationOf(page)).toMatch(/200ms ease-out 0ms both/)
+    expect(animationOf(page)).toMatch(/150ms ease-out 0ms both/)
     expect(animationOf(screen.getByRole('tabpanel'))).toMatch(/200ms/)
 
     render(<DependencyTimeline chain={CHAIN} today="2026-11-10" />)

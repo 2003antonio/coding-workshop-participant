@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import theme, { AVATAR_COLORS, STATUS_COLORS, contrastRatio } from './theme'
+import theme, { AVATAR_COLORS, CARD, STATUS_COLORS, clickableCardSx, contrastRatio } from './theme'
 
 const MODES = ['light', 'dark']
 const AA = 4.5
@@ -61,4 +61,15 @@ describe('avatar and project tile colours', () => {
       })
     })
   }
+})
+
+describe('card feel', () => {
+  it('clickable cards lift with a transform (no layout shift) and never under reduced motion', () => {
+    expect(clickableCardSx['&:hover'].transform).toBe('translateY(-2px)')
+    expect(clickableCardSx['&:hover']).not.toHaveProperty('margin')
+    expect(clickableCardSx['@media (prefers-reduced-motion: reduce)']).toEqual({
+      transition: 'none', '&:hover, &:active': { transform: 'none' },
+    })
+    expect(CARD.radius).toBe(12)
+  })
 })

@@ -21,6 +21,7 @@ import { TeamFormDialog } from '../components/TeamDialogs'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { leadCandidates } from './people'
+import { clickableCardSx } from '../theme'
 
 /** One card per team: name, lead (with avatar), and the members as a stack with their count. */
 function TeamCards({ rows, empty }) {
@@ -34,8 +35,7 @@ function TeamCards({ rows, empty }) {
       {rows.map((t, i) => (
         <Paper component="li" key={t.id} variant="outlined" sx={[{
           p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0,
-          transition: 'border-color 150ms, box-shadow 150ms', '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
-        }, motion('enter', i)]}>
+        }, clickableCardSx, motion('enter', i)]}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
             <ProjectTile name={t.name} size={40} />
             <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>

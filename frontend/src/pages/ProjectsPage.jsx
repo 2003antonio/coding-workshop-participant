@@ -35,7 +35,7 @@ import { useToast } from '../components/toast/toast'
 import ProjectTile, { ProjectName } from '../components/viz/ProjectTile'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
-import { MUTED_ROW_SX } from '../theme'
+import { MUTED_ROW_SX, clickableCardSx } from '../theme'
 import { messageFor } from './apiMessages'
 import { PROJECT_STATUS, formatDate } from './format'
 
@@ -67,9 +67,7 @@ function ProjectCards({ rows, empty, archiveButton }) {
       {rows.map((p, i) => (
         <Paper component="li" key={p.id} variant="outlined" data-muted={p.archived_at ? true : undefined} sx={[{
           p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0,
-          transition: 'border-color 150ms, box-shadow 150ms',
-          '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
-        }, p.archived_at ? MUTED_ROW_SX : {}, motion('enter', i)]}>
+        }, clickableCardSx, p.archived_at ? MUTED_ROW_SX : {}, motion('enter', i)]}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
             <ProjectTile name={p.name} size={40} />
             <Box sx={{ minWidth: 0 }}>

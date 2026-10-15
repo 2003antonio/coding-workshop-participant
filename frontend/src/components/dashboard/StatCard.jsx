@@ -1,6 +1,7 @@
 import Link from '@mui/material/Link'
 import Typography from '@mui/material/Typography'
 import { Link as RouterLink } from 'react-router-dom'
+import { clickableCardSx } from '../../theme'
 import DashboardSection from './DashboardSection'
 
 // The title is the link; its ::after covers the card so the whole card is clickable,
@@ -11,8 +12,7 @@ const stretchedLinkSx = {
 }
 const linkCardSx = {
   position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
-  transition: 'border-color 150ms, box-shadow 150ms',
-  '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
+  ...clickableCardSx,
   '&:has(a:focus-visible)': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
 }
 

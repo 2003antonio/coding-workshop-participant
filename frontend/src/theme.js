@@ -67,6 +67,25 @@ export const toneSx = (tone) => (theme) => {
   return colors ? { color: colors.fg, bgcolor: colors.bg } : {}
 }
 
+/**
+ * The one card style: radius, border and shadow for every card (Paper), and a
+ * gentle lift for cards that are links. The lift is a transform, so nothing
+ * around the card moves, and it is switched off under "reduce motion".
+ */
+export const CARD = {
+  radius: 12,
+  shadow: '0 1px 2px rgba(10, 37, 64, 0.06), 0 1px 3px rgba(10, 37, 64, 0.08)',
+  hoverShadow: '0 6px 16px rgba(10, 37, 64, 0.12), 0 2px 4px rgba(10, 37, 64, 0.08)',
+}
+
+/** sx for a clickable card: lifts 2 px on hover, settles when pressed. */
+export const clickableCardSx = {
+  transition: 'transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out',
+  '&:hover': { transform: 'translateY(-2px)', boxShadow: CARD.hoverShadow, borderColor: 'primary.main' },
+  '&:active': { transform: 'translateY(0)', boxShadow: CARD.shadow },
+  '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover, &:active': { transform: 'none' } },
+}
+
 /** A muted (archived) row: a faint background and secondary text; links and buttons keep their colour. */
 export const MUTED_ROW_SX = { bgcolor: 'action.hover', '& td, & th, & dd, & dt, & h3': { color: 'text.secondary' } }
 
@@ -148,8 +167,9 @@ const theme = createTheme({
     },
     MuiPaper: {
       styleOverrides: {
-        rounded: { borderRadius: 12 },
-        elevation1: { boxShadow: '0 1px 2px rgba(10, 37, 64, 0.06), 0 1px 3px rgba(10, 37, 64, 0.08)' },
+        rounded: { borderRadius: CARD.radius },
+        outlined: { borderColor: 'var(--mui-palette-divider)' },
+        elevation1: { boxShadow: CARD.shadow },
       },
     },
     MuiButton: { defaultProps: { disableElevation: true } },

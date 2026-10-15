@@ -36,20 +36,21 @@ const growX = keyframes`
 export const MOTION = { duration: 200, stagger: 25, maxStaggered: 4 }
 
 const KINDS = {
-  enter: { frames: fadeUp }, // pages, cards: fade in and rise 6 px
+  page: { frames: fadeIn, duration: 150 }, // a new page: a quick fade, no movement
+  enter: { frames: fadeUp }, // cards, panels: fade in and rise 6 px
   fade: { frames: fadeIn }, // table rows: fade only
   grow: { frames: growX, sx: { transformOrigin: 'left center' } }, // bars grow from their start
 }
 
 /**
- * sx for an entrance animation of `kind` ('enter' | 'fade' | 'grow'), the
+ * sx for an entrance animation of `kind` ('page' | 'enter' | 'fade' | 'grow'), the
  * index-th item of a list (for the stagger). {} when motion is reduced.
  */
 export function motionSx(reduced, kind = 'enter', index = 0) {
   if (reduced) return {}
-  const { frames, sx } = KINDS[kind] ?? KINDS.enter
+  const { frames, sx, duration = MOTION.duration } = KINDS[kind] ?? KINDS.enter
   const delay = Math.min(Math.max(index, 0), MOTION.maxStaggered) * MOTION.stagger
-  return { ...sx, animation: `${frames} ${MOTION.duration}ms ease-out ${delay}ms both` }
+  return { ...sx, animation: `${frames} ${duration}ms ease-out ${delay}ms both` }
 }
 
 /** const motion = useMotion(); <Box sx={motion('grow', i)} /> */
