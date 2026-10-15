@@ -254,7 +254,7 @@ members, or distinct people allocated to a project) is smaller, a non-admin gets
 salary-derived field as `null` and `"hidden_reason": "below_min_group"`, never a number. When
 shown, `hidden_reason` is `null`. Admin always gets the numbers (they can see salaries anyway).
 `planned_budget` is typed in, not salary-derived, so it is never hidden from those who may see it.
-Known limit: comparing totals before and after one person joins or leaves can still reveal a salary.
+Known limit: comparing totals before and after one person joins or leaves can still reveal a salary. Also, a manager can change the hours on their own team's assignments, and once 3 or more people are on a project its committed cost is shown to them, so watching that total change as they change one person's hours (or as weeks pass) reveals that colleague's hourly rate. This is an inherent limit of showing managers aggregates at all; every such edit is in the audit log, and the stricter option would be to make the cost fields admin-only.
 
 **Team budget** — `GET /api/teams/{id}/budget` (admin, that team's lead):
 ```json

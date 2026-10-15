@@ -17,6 +17,8 @@ The demo runs locally on my laptop (see [How to run locally](#how-to-run-locally
 Plainly, before you look further:
 - **The cloud deploy was attempted and stopped at database creation**, because the AWS account hit its RDS
   quota (40 of 40 database clusters already in use in `us-east-2`). So the demo runs locally.
+- **No password change yet.** A person an admin adds gets a generated temporary password, shared once, and
+  there is no screen or endpoint to change it afterwards.
 - **Every change is written to an audit log, and the Activity screen shows it** (admin: everything;
   a manager: only their teams' projects, deliverables and assignments; employees: no access). The server
   builds each sentence from a whitelist, so no salary, rate or cost figure is ever in it, for anyone.
@@ -69,7 +71,7 @@ The server checks the role on every request; hiding a button in the UI is only a
 | Teams | Create, choose the lead, add or remove members, archive | See the teams they lead | See their own team |
 | Reports | All 7 | All 7, limited to their teams | 4 of 7: project status, resources (their own hours), deliverables, dependencies |
 
-Nothing is ever deleted: records are archived, and changes are written to an audit log.
+Records are never deleted: they are archived, and changes are written to an audit log. (The one thing that is removed is a dependency link between two deliverables, which can be taken off and added again.)
 
 ## Architecture
 
@@ -85,7 +87,7 @@ and only one layer on each side does the talking.
 | Entry point | `backend/<service>/function.py` | The Lambda handler. |
 | Routes | `backend/<service>/routes.py` | Reads the request and checks the caller's role. |
 | Rules | `backend/<service>/services.py` | The business rules (40-hour limit, loops, budget hiding). |
-| Repository | `backend/<service>/repository.py` | The only place SQL is written. |
+| Repository | `backend/<service>/repository.py` | Where SQL is written, except two small shared queries in `backend/common/` (`audit.py` writes `audit_log`, `rbac.py` reads `employees`). |
 | Shared kernel | `backend/common/` | Database, tokens, roles, validation, errors, audit, budget maths, week maths, migrations. |
 
 ```
@@ -208,7 +210,7 @@ Known blockers to check once a cluster is available:
 - **The database name.** Terraform names the database after the project with the dashes removed, and passes it to every Lambda as `POSTGRES_NAME`. Anything run by hand (a seed, a migration) must use the same name.
 - **The `Authorization` header.** Every request carries `Authorization: Bearer <token>`. It must reach the Lambda through CloudFront unchanged. Not yet tested.
 - **The API address.** The frontend calls `http://localhost:3001` unless `VITE_API_URL` is set when it is built. For AWS it has to point at the CloudFront address. (`frontend/.env.sample` still names old `REACT_APP_*` variables, which Vite ignores.)
-- **Lambda memory.** Terraform gives each Lambda 128 MB. Password checking uses scrypt with up to 64 MiB, so sign-in may need more memory. Not measured.
+- **Lambda memory.** Terraform gives each Lambda 128 MB. Password checking uses scrypt, which needs about 16 MiB (64 MiB is only the cap set in `auth.py`), so sign-in may need more memory. Not measured.
 - **No admin on a fresh cloud database.** There is no public way to create the first account. `scripts/seed_admin.py --allow-remote` can do it, but only from a machine that can reach the database inside its private network.
 
 ## Tests
@@ -236,7 +238,8 @@ Both coverage runs fail the build under 80%.
 - **The token signing key is derived from the database password.** It saves managing another secret, but every service must share the same `POSTGRES_PASS`, and anyone who knows the database password could make tokens.
 - **The refresh token is kept in the browser's `localStorage`.** The access token stays in memory only. A script-injection bug on the page could read the refresh token.
 - **No per-IP rate limiting.** Repeated failed sign-ins are not slowed down by address.
-- **Hiding small groups doesn't stop every leak.** Budgets of groups under 3 people are hidden, but comparing a team's total before and after one person joins or leaves can still reveal that person's pay.
+- **Hiding small groups doesn't stop every leak.** Budgets of groups under 3 people are hidden, but comparing a team's total before and after one person joins or leaves can still reveal that person's pay. Also, a manager can change the hours on their own team's assignments, and once 3 or more people are on a project its committed cost is shown to them, so watching that total change as they change one person's hours (or as weeks pass) reveals that colleague's hourly rate. This is an inherent limit of showing managers aggregates at all; every such edit is in the audit log, and the stricter option would be to make the cost fields admin-only.
+- **Cloud database TLS is on, but the server certificate is not checked.** `backend/common/db.py` uses `CERT_NONE` because the Lambda package does not ship the RDS CA bundle. To verify the server, bundle the CA and switch to `CERT_REQUIRED`.
 - **One visibility rule for managers:** a manager sees only the projects of teams they lead. If an admin assigns them to another team's project, they can't see it, but the hours still count toward their 40.
 - **Simple cost maths:** hourly rate = annual salary / 2080, using today's salary (no history). A partial week counts as a full week.
 - **The shared kernel is copied, not packaged.** There is one source in `backend/common/`, copied into each Lambda by `sync-common.sh`.
@@ -246,7 +249,7 @@ Both coverage runs fail the build under 80%.
 As of October 15, 2026:
 
 - The Activity screen lists the audit log as plain sentences; it does not show before/after values.
-- No change-password screen: a new person keeps the temporary password the admin generated until one exists.
+- No change-password screen: a new person keeps the temporary password the admin generated, and there is no way yet to change it in the app.
 - Unarchive brings back people and projects only (not teams), and never their old assignments.
 - The salary reveal is a display guard only: the API still sends salaries and hourly rates to an admin.
 - Lists are not paginated. The app is sized for demo data.
