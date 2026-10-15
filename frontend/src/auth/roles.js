@@ -24,6 +24,9 @@ export const canManageProject = (role, user, project) =>
 export const canSeeTeamBudget = (role, user, team) =>
   role === 'admin' || (Boolean(user) && team?.lead?.id === user.id)
 
+/** Sees the dashboard on Home (it uses reports 2, 5 and 7, which employees may not open). */
+export const canSeeDashboard = (role) => role === 'admin' || role === 'manager'
+
 /** Reports each role may open (§8); employees get 403 on the others. */
 const REPORTS_FOR_ROLE = {
   admin: ['status', 'risk', 'resources', 'deliverables', 'capacity', 'chain', 'budget'],

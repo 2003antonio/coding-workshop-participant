@@ -1,0 +1,58 @@
+// The admin (company) and manager (team) dashboard on Home. Every report has
+// its own useLoad, so one failing report only shows an error in its own cards.
+// The server already limits each report to what the caller may see (§8).
+import { useCallback } from 'react'
+import Box from '@mui/material/Box'
+import Typography from '@mui/material/Typography'
+import { useLoad } from '../../auth/useApi'
+import * as reportService from '../../services/reportService'
+import AtRiskList from './AtRiskList'
+import BudgetBars from './BudgetBars'
+import DashboardSection from './DashboardSection'
+import { activeCount, atRiskCount, nearCapacityCount, overBudgetCount, overdueCount } from './dashboardMath'
+import StatCard from './StatCard'
+
+/** Report 5's default: people above this many hours in a week are "near capacity". */
+const NEAR_CAPACITY_HOURS = 32
+
+export default function Dashboard({ role }) {
+  const loadStatus = useCallback((call) => call((token) => reportService.projectStatus(token)), [])
+  const status = useLoad(loadStatus)
+  const loadRisk = useCallback((call) => call((token) => reportService.atRiskProjects(token)), [])
+  const risk = useLoad(loadRisk)
+  const loadBudget = useCallback((call) => call((token) => reportService.budgetReport(token)), [])
+  const budget = useLoad(loadBudget)
+  const loadCapacity = useCallback(
+    (call) => call((token) => reportService.overAllocated(token, { threshold: NEAR_CAPACITY_HOURS })),
+    [],
+  )
+  const capacity = useLoad(loadCapacity)
+
+  return (
+    <>
+      <Typography color="text.secondary" sx={{ mb: 2 }}>
+        {role === 'admin' ? 'Company overview: every team and project.' : 'Overview of the teams you lead.'}
+      </Typography>
+
+      <Box component="section" aria-labelledby="glance-heading" sx={{ mb: 3 }}>
+        <Typography id="glance-heading" variant="h6" component="h2" gutterBottom>At a glance</Typography>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+          <StatCard id="stat-active" title="Active projects" result={status} count={activeCount} />
+          <StatCard id="stat-risk" title="At risk" result={risk} count={atRiskCount} />
+          <StatCard id="stat-overdue" title="Overdue deliverables" result={status} count={overdueCount} />
+          <StatCard id="stat-budget" title="Over budget" result={budget} count={overBudgetCount} />
+          <StatCard id="stat-capacity" title="Near capacity" result={capacity} count={nearCapacityCount} />
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, alignItems: 'start' }}>
+        <DashboardSection id="risk-list" title="At-risk projects" result={risk} skeletonLines={4}>
+          {(data) => <AtRiskList projects={data.projects} />}
+        </DashboardSection>
+        <DashboardSection id="budget-bars" title="Budget used" result={budget} skeletonLines={4}>
+          {(data) => <BudgetBars projects={data.projects} />}
+        </DashboardSection>
+      </Box>
+    </>
+  )
+}

@@ -1,26 +1,31 @@
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import Typography from '@mui/material/Typography'
-import { useMediaQuery } from 'react-responsive'
+import { canSeeDashboard } from '../auth/roles'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
+import Dashboard from '../components/dashboard/Dashboard'
+import { useBreakpoint } from '../hooks/useBreakpoint'
+import { ROLE_LABELS } from './format'
 
-const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
-
-/** The first protected page: who is signed in. Navigation and sign-out live in AppShell. */
+/**
+ * Home: "Welcome, <name>" for every role, then the company dashboard (admin),
+ * the team dashboard (manager) or the person's own work (employee).
+ */
 export default function HomePage() {
   const { user, role } = useAuth()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
+  const { isPhone } = useBreakpoint()
 
   return (
-    <AppShell>
+    <AppShell maxWidth="lg">
       <Typography variant={isPhone ? 'h5' : 'h4'} component="h1" gutterBottom>
         Welcome, {user?.name}
       </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <Typography color="text.secondary">Signed in as</Typography>
         <Chip label={ROLE_LABELS[role] ?? role} color="primary" size="small" />
       </Box>
+      {canSeeDashboard(role) && <Dashboard role={role} />}
     </AppShell>
   )
 }
