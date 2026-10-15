@@ -8,12 +8,20 @@ Use a desktop window at least 1280 px wide.
 
 Sign in as `admin@acme-demo.test`.
 
-1. **Home.** Say: "Five cards, each one a link." Point at **At risk 2** and **Over budget 1**.
+1. **Home.** Point at the **Portfolio health** bar: "1 of 3 projects healthy", one at risk, one over budget,
+   each project counted once. Say: "Five cards under it, each one a link." Point at **At risk 2** and
+   **Over budget 1**.
 2. Click the **At risk** card. Reports opens on the **At risk** tab: Billing v2 (overdue deliverable,
    over budget) and Data lake (a dependency starts before its date).
-3. Click **Billing v2**. In the header, the budget bar: **Over budget**, "Committed $41,180 of $38,000
-   planned (108%)", "Spent so far: 27%". Say: "The light bar is what the assignments commit, the dark
-   part is what is spent so far, the line is the plan."
+3. Click **Billing v2**. The **health strip** under the title has three tiles:
+   - **Budget**: **Over budget**, "Committed $41,180 of $38,000 planned (108%)", "Spent so far: 27%".
+     Say: "The light bar is what the assignments commit, the dark part is what is spent so far, the
+     line is the plan."
+   - **Schedule**: "1 of 5 done, 1 overdue, 2 blocked", with a bar and every count in words.
+   - **People**: four avatars and "4 people, 70 h this week".
+   Click the **People** tab and change Ana's hours from 30 to 20 in place: the Budget tile says
+   "Updating..." and its numbers drop at once, no reload. Put it back to 30. (Employees see Schedule
+   and People only, never a budget tile.)
 4. Click the **Dependencies** tab: the timeline, longest chain outlined, the red line is today.
 5. Click **Employees** in the sidebar. Salaries show `$ ••••••`. Click the eye **Show salary for Ana
    Silva**: `$124,800.00`. Say: "Masked by default against shoulder-surfing; it hides again after 30
@@ -29,8 +37,8 @@ Sign out.
 
 Sign in as `marta@acme-demo.test`.
 
-1. **Small groups are hidden.** Click **Projects**, then **Mobile app**. The header says "Hidden: fewer
-   than 3 people". Click the **Budget** tab: "Totals are hidden because fewer than 3 people are in this
+1. **Small groups are hidden.** Click **Projects**, then **Mobile app**. The Budget tile of the health
+   strip says "Hidden: fewer than 3 people". Click the **Budget** tab: "Totals are hidden because fewer than 3 people are in this
    group, so they could reveal someone’s pay." The planned budget ($12,000.00) is still shown.
 2. **The 40-hour limit.** Still on Mobile app, click **People**, then **Assign person**. Person: **Bo
    Chen**. Hours per week: **25**. Start date: the Monday two weeks from now; end date: the Sunday of the

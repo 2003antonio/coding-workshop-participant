@@ -30,18 +30,21 @@ Taken with the seeded demo data on October 14, 2026 (`docs/screenshots/final/`).
 
 | | |
 |---|---|
-| ![Admin Home: five clickable cards, at-risk projects, budget bars](docs/screenshots/final/02-admin-home.png) | ![A project page: the shared budget bar in the header, per-person costs masked](docs/screenshots/final/06-project-budget-bar.png) |
-| Admin Home. Every card is a link to the detail. | Project page. The budget bar says committed against planned and spent so far; per-person costs stay masked until the eye is clicked. |
-| ![Employee Home: one-line summary and four cards](docs/screenshots/final/04-employee-home.png) | ![Reports, Resources: the hours heat-map](docs/screenshots/final/08-reports-heatmap.png) |
-| Employee Home: the coming weeks in one line, then cards that lead to My work and the projects. | Reports, Resources: hours per person per week. |
-| ![Dependencies timeline with the longest chain outlined](docs/screenshots/final/07-dependencies-timeline.png) | ![Employees with salaries masked](docs/screenshots/final/09-employees-masked-salary.png) |
-| The Dependencies tab: a timeline with the longest chain outlined. | Employees (admin): salaries masked until asked for. |
+| ![Admin Home: portfolio health bar, five clickable cards, at-risk projects, budget bars](docs/screenshots/final/02-admin-home.png) | ![A project page: the health strip with budget, schedule and people tiles](docs/screenshots/final/06-project-health-strip.png) |
+| Admin Home. Portfolio health counts each project once; every card is a link to the detail. | Project page. The health strip: budget (committed against planned, spent so far), schedule by status, and who is on it this week. It updates as soon as an assignment or deliverable changes. |
+| ![Deliverables tab with status stripes and due chips](docs/screenshots/final/07-deliverables-tab.png) | ![People tab with avatars and hours against the 40 h limit](docs/screenshots/final/08-people-tab.png) |
+| Deliverables: a status stripe per row and "Due in 28 days" / "3 days overdue" chips. | People: hours per week against the 40 h limit; per-person costs stay masked until the eye is clicked. |
+| ![Projects as cards](docs/screenshots/final/05-projects-cards.png) | ![Teams as cards with lead and member avatars](docs/screenshots/final/09-teams.png) |
+| Projects as cards (the table is the default; the choice is remembered). | Teams with their lead and members. |
+| ![Reports, Project status with a status bar per project](docs/screenshots/final/10-reports-status.png) | ![Employee Home: one-line summary with a sparkline, and four cards](docs/screenshots/final/04-employee-home.png) |
+| Reports, Project status: done, in progress and not started per project. | Employee Home: the coming weeks in one line and a sparkline, then cards that lead to My work and the projects. |
 
 More: [sign-in](docs/screenshots/final/01-login.png), [manager Home](docs/screenshots/final/03-manager-home.png),
-[Projects](docs/screenshots/final/05-projects.png), [phone](docs/screenshots/final/10-phone-home.png),
-[dark mode](docs/screenshots/final/11-dark-home.png), [empty state for someone with no work](docs/screenshots/final/12-empty-state-hal.png),
-[a manager's hidden small-group budget](docs/screenshots/final/13-manager-budget-hidden.png).
-`npm run e2e` also saves every page for every demo account under `docs/screenshots/<account>/`.
+[hours heat-map](docs/screenshots/final/11-reports-heatmap.png), [dependencies timeline](docs/screenshots/final/12-dependencies-timeline.png),
+[employees with salaries masked](docs/screenshots/final/13-employees-masked-salary.png), [phone](docs/screenshots/final/14-phone-project.png),
+[dark mode](docs/screenshots/final/15-dark-project.png), [empty state for someone with no work](docs/screenshots/final/16-empty-state-hal.png),
+[a manager's hidden small-group budget](docs/screenshots/final/17-manager-budget-hidden.png).
+`npm run e2e` also saves every page for every demo account under `docs/screenshots/<account>/` (not committed).
 
 ## What it does, by role
 
@@ -207,9 +210,9 @@ Last full run on this laptop, October 14, 2026 (all from that run):
 | Check | Result |
 |---|---|
 | Backend, `pytest` | 739 passed, 99.01% coverage |
-| Frontend, `npm run coverage` (Vitest) | 425 passed in 35 files; 96.02% statements, 91.64% branches, 96.08% functions, 96.87% lines |
+| Frontend, `npm run coverage` (Vitest) | 459 passed in 37 files; 95.97% statements, 90.72% branches, 96.2% functions, 97.09% lines |
 | `npm run lint` | No problems |
-| `npm run build` | Built; main bundle 422.72 kB (137.47 kB gzipped) |
+| `npm run build` | Built; main bundle 423.75 kB (137.82 kB gzipped) |
 | End-to-end, Playwright (`e2e/01-pages`, `e2e/02-flows`) | 11 passed |
 | Role smoke, `scripts/smoke_roles.py` | 11 passed, 0 failed |
 
