@@ -135,9 +135,11 @@ describe('Reports: content', () => {
     expect(headersOf('Project budgets'))
       .toEqual(['Project', 'Team', 'Planned budget', 'Committed', 'Used to date', 'Used %', 'Budget', 'Note'])
     const cells = within(rowFor('Billing v2')).getAllByRole('cell').map((c) => c.textContent)
-    expect(cells).toEqual(['Platform', '12,000.00', '9,977.73', '3,090.78', '25.8%', 'Within budget', ''])
+    // The Budget column is the shared bar without words: 83% committed shows "Close to budget".
+    expect(cells).toEqual(['Platform', '$12,000.00', '$9,977.73', '$3,090.78', '25.8%', 'Close to budget', ''])
+    expect(within(rowFor('Billing v2')).getByTestId('budget-bar').querySelector('[data-kind="close"]')).toBeInTheDocument()
     const teams = screen.getByRole('table', { name: 'Team budgets' })
-    expect(within(rowFor('Platform', teams)).getByText('246,000.50')).toBeInTheDocument()
+    expect(within(rowFor('Platform', teams)).getByText('$246,000.50')).toBeInTheDocument()
   })
 
   it('budget flags a project whose committed cost is over its planned budget', async () => {
@@ -149,7 +151,7 @@ describe('Reports: content', () => {
     expect(within(rowFor('Billing v2')).getByText('Over budget')).toBeInTheDocument()
     expect(within(rowFor('Billing v2')).getByText('34.3%')).toBeInTheDocument()
     expect(within(rowFor('Data Lake')).getByText('Not set')).toBeInTheDocument()
-    expect(within(rowFor('Data Lake')).getByText('No planned budget')).toBeInTheDocument()
+    expect(within(rowFor('Data Lake')).getByText('No budget set')).toBeInTheDocument() // the shared budget bar's wording
     expect(within(rowFor('Data Lake')).getAllByRole('cell')[4]).toHaveTextContent('—') // no percent without a budget
   })
 

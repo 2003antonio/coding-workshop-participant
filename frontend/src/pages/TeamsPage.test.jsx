@@ -90,7 +90,7 @@ describe('Team detail', () => {
     expect(rowFor('Dee Data')).toBeInTheDocument()
     // Admin always gets the numbers, even for a team of one.
     const budget = await screen.findByRole('region', { name: 'Team budget' })
-    expect(within(budget).getByText('70,000.00')).toBeInTheDocument()
+    expect(within(budget).getByText('$70,000.00')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add member' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add a member to Data' })
@@ -157,7 +157,7 @@ describe('Team detail', () => {
     renderApp('/teams/t-1')
     const budget = await screen.findByRole('region', { name: 'Team budget' })
     // Platform has 3 members: Eve 90,000.50 + Bo 83,200 + Cy 72,800.
-    expect(within(budget).getByText('246,000.50')).toBeInTheDocument()
+    expect(within(budget).getByText('$246,000.50')).toBeInTheDocument()
     expect(within(budget).getByText(/Salaries of 3 members/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit team|add member|remove/i })).not.toBeInTheDocument()
   })

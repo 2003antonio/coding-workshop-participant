@@ -1,22 +1,22 @@
 import { useCallback } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import LinearProgress from '@mui/material/LinearProgress'
 import Skeleton from '@mui/material/Skeleton'
 import Typography from '@mui/material/Typography'
 import { canSeeSalaries } from '../auth/roles'
 import { useLoad } from '../auth/useApi'
 import * as budgetService from '../services/budgetService'
 import { formatMoney, formatPercent } from '../pages/format'
+import BudgetBar from './BudgetBar'
 import BudgetFlag from './BudgetFlag'
 import BudgetPanel from './BudgetPanel'
 import { LoadState } from './PageState'
 import ResponsiveTable from './ResponsiveTable'
 
 /**
- * A one-line summary for the project header: how much of the planned budget is
- * used, as a bar and in words. When the server hides the totals it says so,
- * never 0 (and never a figure that might have been sent anyway).
+ * The project header's budget: the same bar as Home and Reports (committed
+ * against planned, spent so far inside it, "Over budget" only when over), in
+ * words with $ amounts. Hidden totals say "Hidden", never 0.
  */
 export function ProjectBudgetBar({ project }) {
   const load = useCallback(
@@ -37,19 +37,9 @@ export function ProjectBudgetBar({ project }) {
       </Box>
     )
   }
-  const budget = result.data
-  if (budget.hidden_reason) return text('Budget progress is hidden to protect individual pay.')
-  if (budget.planned_budget === null || budget.planned_budget === undefined) return text('No planned budget set.')
-  if (budget.percent_used === null || budget.percent_used === undefined) {
-    return text('No percentage to show: the planned budget is 0.')
-  }
-  const over = budget.over_budget === true
   return (
-    <Box sx={{ maxWidth: 360 }}>
-      <LinearProgress variant="determinate" value={Math.min(budget.percent_used, 100)} aria-label="Budget used"
-        color={over ? 'error' : 'primary'} sx={{ height: 8, borderRadius: 1 }} />
-      {text(`${formatPercent(budget.percent_used)} of the planned budget used${over ? ' · Over budget' : ''}`,
-        over ? 'error.main' : 'text.secondary')}
+    <Box component="section" aria-label="Budget summary" sx={{ maxWidth: 440 }}>
+      <BudgetBar budget={result.data} name={<Typography variant="subtitle2" component="span">Budget</Typography>} />
     </Box>
   )
 }

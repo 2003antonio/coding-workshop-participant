@@ -22,6 +22,7 @@ import {
 } from '../pages/format'
 import { useBreakpoint } from '../hooks/useBreakpoint'
 import { toneSx } from '../theme'
+import BudgetBar from './BudgetBar'
 import BudgetFlag from './BudgetFlag'
 import CapacityHeatmap, { HeatLegend } from './heatmap/CapacityHeatmap'
 import { shiftWeek } from './heatmap/heatScale'
@@ -283,7 +284,7 @@ export function BudgetReport() {
                 { key: 'used', label: 'Used to date', align: 'right', render: (p) => money(p.used_cost_to_date) },
                 { key: 'percent', label: 'Used %', align: 'right', render: (p) => formatPercent(p.percent_used) },
                 { key: 'flag', label: 'Budget', render: (p) => (p.hidden_reason ? '—' : (
-                  <BudgetFlag plannedBudget={p.planned_budget} overBudget={p.over_budget} />
+                  <Box sx={{ minWidth: 140 }}><BudgetBar budget={p} index={0} words={false} /></Box>
                 )) },
                 { key: 'note', label: 'Note', render: note },
               ]} />

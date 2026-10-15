@@ -91,7 +91,10 @@ describe('Project detail: deliverables', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add deliverable' })
 
     await user.type(within(dialog).getByRole('textbox', { name: /^name/i }), 'Launch')
+    // Both dates start filled in (today, moved inside the project), so clear them first.
+    await user.clear(within(dialog).getByLabelText(/start date/i))
     await user.type(within(dialog).getByLabelText(/start date/i), '2026-10-01')
+    await user.clear(within(dialog).getByLabelText(/due date/i))
     await user.type(within(dialog).getByLabelText(/due date/i), '2027-01-15')
     await user.click(within(dialog).getByRole('button', { name: 'Add deliverable' }))
     expect(within(dialog).getByText('Pick a date from Nov 2, 2026 to Mar 31, 2027.')).toBeInTheDocument()
@@ -153,7 +156,7 @@ describe('Project detail: people', () => {
     await openTab(user, 'People')
     await screen.findByRole('table', { name: 'Assignments' })
     expect(headersOf('Assignments')).toEqual(['Person', 'Hours per week', 'Dates', 'Weekly cost', 'Actions'])
-    expect(within(rowFor('Eve Employee')).getByText('865.39')).toBeInTheDocument() // 20 h × 90,000.50 / 2080
+    expect(within(rowFor('Eve Employee')).getByText('$865.39')).toBeInTheDocument() // 20 h × 90,000.50 / 2080
 
     await user.click(screen.getByRole('button', { name: 'Assign person' }))
     const dialog = await screen.findByRole('dialog', { name: 'Assign someone to Billing v2' })
@@ -235,7 +238,7 @@ describe('Project detail: budget', () => {
     expect(within(panel).getByText('Within budget')).toBeInTheDocument()
     expect(headersOf('Cost per assignment'))
       .toEqual(['Person', 'Hours per week', 'Weeks', 'Hourly rate', 'Committed', 'Used to date'])
-    expect(within(rowFor('Bo Builder')).getByText('40.00')).toBeInTheDocument()
+    expect(within(rowFor('Bo Builder')).getByText('$40.00')).toBeInTheDocument()
   })
 
   it('the manager sees totals only when at least 3 people are assigned', async () => {
@@ -243,8 +246,8 @@ describe('Project detail: budget', () => {
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'Budget')
     const panel = await screen.findByRole('region', { name: 'Project budget' })
-    expect(within(panel).getByText('12,000.00')).toBeInTheDocument()
-    expect(within(panel).getByText('9,977.73')).toBeInTheDocument()
+    expect(within(panel).getByText('$12,000.00')).toBeInTheDocument()
+    expect(within(panel).getByText('$9,977.73')).toBeInTheDocument()
     expect(within(panel).getByText(/3 people assigned/)).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Cost per assignment' })).not.toBeInTheDocument()
   })
@@ -427,8 +430,8 @@ describe('salary data never reaches a non-admin screen', () => {
     await openTab(user, 'People')
     await screen.findByRole('table', { name: 'Assignments' })
     expect(screen.queryByRole('columnheader', { name: /cost|rate|salary/i })).not.toBeInTheDocument()
-    expect(screen.queryByText('865.39')).not.toBeInTheDocument()
-    expect(screen.queryByText('43.27')).not.toBeInTheDocument()
+    expect(screen.queryByText(/865\.39/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/43\.27/)).not.toBeInTheDocument()
   })
 
   it('a manager never sees hourly rates or per-person costs in the budget', async () => {
@@ -436,10 +439,10 @@ describe('salary data never reaches a non-admin screen', () => {
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'Budget')
     const panel = await screen.findByRole('region', { name: 'Project budget' })
-    expect(within(panel).getByText('9,977.73')).toBeInTheDocument() // totals are allowed
+    expect(within(panel).getByText('$9,977.73')).toBeInTheDocument() // totals are allowed
     expect(screen.queryByRole('table', { name: 'Cost per assignment' })).not.toBeInTheDocument()
     expect(screen.queryByText(/hourly rate/i)).not.toBeInTheDocument()
-    expect(screen.queryByText('43.27')).not.toBeInTheDocument()
-    expect(screen.queryByText('6,057.73')).not.toBeInTheDocument()
+    expect(screen.queryByText(/43\.27/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/6,057\.73/)).not.toBeInTheDocument()
   })
 })

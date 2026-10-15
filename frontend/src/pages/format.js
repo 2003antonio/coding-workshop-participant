@@ -1,9 +1,9 @@
 // Display helpers shared by the pages.
 
-const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const day = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
-/** 52000 -> "52,000.00" (the API sends money as plain numbers, no currency). */
+/** 52000 -> "$52,000.00" (the API sends money as plain numbers, in US dollars). */
 export const formatMoney = (amount) => money.format(amount)
 
 /** 25.8 -> "25.8%", 40 -> "40.0%"; null -> "—". The API sends one decimal. */

@@ -109,39 +109,51 @@ describe('Project header: budget bar', () => {
     }),
   })
 
-  it('shows the share of the planned budget used, as a bar and in words', async () => {
+  const summary = () => screen.findByRole('region', { name: 'Budget summary' })
+
+  it('shows committed against planned and spent so far, in dollars, with the shared bar', async () => {
     signedInAs('admin')
     renderApp('/projects/p-1')
-    const bar = await screen.findByRole('progressbar', { name: 'Budget used' })
-    expect(bar).toHaveAttribute('aria-valuenow', '25.8')
-    expect(screen.getByText('25.8% of the planned budget used')).toBeInTheDocument()
+    const box = await summary()
+    expect(within(box).getByText('Committed $9,978 of $12,000 planned (83%)')).toBeInTheDocument()
+    expect(within(box).getByText('Spent so far: 26%')).toBeInTheDocument()
+    expect(within(box).getByText('Close to budget')).toBeInTheDocument()
+    expect(within(box).queryByText('Over budget')).not.toBeInTheDocument()
+    expect(box.querySelector('[data-kind="close"]')).toBeInTheDocument()
     // The text E2E looks for stays as it was.
     expect(screen.getByText(/Platform · Manager: Max Manager · Nov 2, 2026 – Mar 31, 2027/)).toBeInTheDocument()
   })
 
-  it('over budget says so in words; the bar stops at 100', async () => {
-    signedInAs('manager', { routes: budget({ percent_used: 130.5, over_budget: true }) })
+  it('over budget: the chip only when over_budget, and both measures in words (no "27% used · Over budget")', async () => {
+    signedInAs('manager', {
+      routes: budget({ planned_budget: 38000, committed_cost: 41180, percent_used: 27.2, over_budget: true }),
+    })
     renderApp('/projects/p-1')
-    expect(await screen.findByText('130.5% of the planned budget used · Over budget')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar', { name: 'Budget used' })).toHaveAttribute('aria-valuenow', '100')
+    const box = await summary()
+    expect(within(box).getByText('Over budget')).toBeInTheDocument()
+    expect(within(box).getByText('Committed $41,180 of $38,000 planned (108%)')).toBeInTheDocument()
+    expect(within(box).getByText('Spent so far: 27%')).toBeInTheDocument()
+    expect(box).not.toHaveTextContent(/used · Over budget/)
+    // The track stays neutral; only the fill is red.
+    expect(box.querySelector('[data-kind="over"]')).toBeInTheDocument()
   })
 
-  it('hidden totals show a note and no figure, even if one was sent', async () => {
+  it('hidden totals say "Hidden" and no figure, even if one was sent', async () => {
     signedInAs('manager', { routes: budget({ percent_used: 41.5, hidden_reason: 'below_min_group' }) })
     renderApp('/projects/p-1')
-    expect(await screen.findByText('Budget progress is hidden to protect individual pay.')).toBeInTheDocument()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
-    expect(screen.queryByText(/41\.5/)).not.toBeInTheDocument()
+    const box = await summary()
+    expect(within(box).getByText('Hidden: fewer than 3 people')).toBeInTheDocument()
+    expect(box.querySelector('[data-kind]')).not.toBeInTheDocument()
+    expect(screen.queryByText(/41\.5|9,97/)).not.toBeInTheDocument()
   })
 
   it.each([
-    [{ planned_budget: null, percent_used: null, over_budget: null }, 'No planned budget set.'],
-    [{ planned_budget: 0, percent_used: null, over_budget: true }, 'No percentage to show: the planned budget is 0.'],
-  ])('without a usable planned budget it says why (%#)', async (fields, sentence) => {
+    [{ planned_budget: null, percent_used: null, over_budget: null }, 'No budget set'],
+    [{ planned_budget: 0, percent_used: null, over_budget: true }, 'Committed $9,978 of $0 planned'],
+  ])('without a usable planned budget it says so (%#)', async (fields, sentence) => {
     signedInAs('admin', { routes: budget(fields) })
     renderApp('/projects/p-1')
-    expect(await screen.findByText(sentence)).toBeInTheDocument()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(within(await summary()).getByText(sentence)).toBeInTheDocument()
   })
 
   it('a failed load says so without blanking the page, and can be retried', async () => {
@@ -158,7 +170,7 @@ describe('Project header: budget bar', () => {
     expect(screen.getByRole('table', { name: 'Deliverables' })).toBeInTheDocument()
     fail = false
     await user.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByRole('progressbar', { name: 'Budget used' })).toBeInTheDocument()
+    expect(await summary()).toBeInTheDocument()
     expect(server.count('GET', '/api/projects/p-1/budget')).toBe(2)
   })
 
@@ -166,7 +178,7 @@ describe('Project header: budget bar', () => {
     const server = signedInAs('employee')
     renderApp('/projects/p-1')
     await screen.findByRole('table', { name: 'Deliverables' })
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Budget summary' })).not.toBeInTheDocument()
     await waitFor(() => expect(server.count('GET', '/api/projects/p-1/budget')).toBe(0))
   })
 })
