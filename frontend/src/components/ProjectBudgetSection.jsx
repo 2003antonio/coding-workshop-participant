@@ -13,7 +13,17 @@ import BudgetPanel from './BudgetPanel'
 import { Masked, RevealButton } from './MaskedMoney'
 import { useRevealSet } from './reveal'
 import { LoadState } from './PageState'
+import { useProjectRefresh } from './projectRefresh'
 import ResponsiveTable from './ResponsiveTable'
+
+/** A quiet "Updating…" next to numbers that are being fetched again (the old ones stay meanwhile). */
+export function Updating() {
+  return (
+    <Typography component="span" variant="caption" color="text.secondary" role="status" sx={{ ml: 1, fontWeight: 400 }}>
+      Updating…
+    </Typography>
+  )
+}
 
 /**
  * The project header's budget: the same bar as Home and Reports (committed
@@ -25,7 +35,8 @@ export function ProjectBudgetBar({ project }) {
     (call) => call((token) => budgetService.getProjectBudget(token, project.id)),
     [project.id],
   )
-  const result = useLoad(load)
+  const { refreshKey } = useProjectRefresh()
+  const result = useLoad(load, refreshKey)
   const text = (children, color = 'text.secondary') => <Typography variant="body2" color={color}>{children}</Typography>
 
   if (result.status === 'loading') {
@@ -40,8 +51,13 @@ export function ProjectBudgetBar({ project }) {
     )
   }
   return (
-    <Box component="section" aria-label="Budget summary" sx={{ maxWidth: 440 }}>
-      <BudgetBar budget={result.data} name={<Typography variant="subtitle2" component="span">Budget</Typography>} />
+    <Box component="section" aria-label="Budget summary" aria-busy={result.updating}
+      sx={{ maxWidth: 440, opacity: result.updating ? 0.7 : 1, transition: 'opacity 150ms' }}>
+      <BudgetBar budget={result.data} name={(
+        <Typography variant="subtitle2" component="span">
+          Budget{result.updating && <Updating />}
+        </Typography>
+      )} />
     </Box>
   )
 }
@@ -57,7 +73,8 @@ export default function ProjectBudgetSection({ project, role }) {
     (call) => call((token) => budgetService.getProjectBudget(token, project.id)),
     [project.id],
   )
-  const result = useLoad(load)
+  const { refreshKey } = useProjectRefresh()
+  const result = useLoad(load, refreshKey)
   const showLines = canSeeSalaries(role)
   const reveal = useRevealSet() // per person, masked until the admin clicks the eye
 
@@ -67,7 +84,7 @@ export default function ProjectBudgetSection({ project, role }) {
         const hasBudget = budget.planned_budget !== null && budget.planned_budget !== undefined
         const people = budget.allocated_people
         return (
-          <BudgetPanel title="Project budget" hiddenReason={budget.hidden_reason}
+          <BudgetPanel title="Project budget" updating={result.updating} hiddenReason={budget.hidden_reason}
             summary={[['Planned budget', budget.planned_budget, hasBudget ? undefined : 'Not set']]}
             figures={[
               ['Committed cost', budget.committed_cost],

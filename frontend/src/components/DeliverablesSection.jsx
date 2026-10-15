@@ -6,6 +6,7 @@ import Chip from '@mui/material/Chip'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import { useApi, useLoad } from '../auth/useApi'
+import { useProjectRefresh } from './projectRefresh'
 import { detailsSentence, namesOf } from '../services/errorDetails'
 import * as projectService from '../services/projectService'
 import { ARCHIVE_NOTE, messageFor } from '../pages/apiMessages'
@@ -33,14 +34,20 @@ export default function DeliverablesSection({ project, canEdit }) {
     (call) => call((token) => projectService.listDeliverables(token, project.id)),
     [project.id],
   )
-  const result = useLoad(load)
+  const { refreshKey, refresh } = useProjectRefresh()
+  const result = useLoad(load, refreshKey)
+  // After a change: reload this list, and refresh the rest of the project page (header budget, health strip).
+  const changed = () => {
+    result.reload()
+    refresh()
+  }
   const rows = result.data ?? []
 
   async function handleAdd(payload) {
     const created = await api((token) => projectService.createDeliverable(token, project.id, payload))
     setDialog(null)
     setNotice({ severity: 'success', text: `${created.name} was added.` })
-    result.reload()
+    changed()
   }
 
   async function handleDependencies(dependsOn) {
@@ -48,7 +55,7 @@ export default function DeliverablesSection({ project, canEdit }) {
       projectService.setDependencies(token, project.id, dialog.deliverable.id, dependsOn))
     setDialog(null)
     setNotice({ severity: 'success', text: `Dependencies of ${updated.name} were saved.` })
-    result.reload()
+    changed()
   }
 
   async function handleEdit(changes) {
@@ -60,7 +67,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     const updated = await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, changes))
     setDialog(null)
     setNotice({ severity: 'success', text: `${updated.name} was updated.` })
-    result.reload()
+    changed()
   }
 
   async function handleArchive() {
@@ -68,7 +75,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     await api((token) => projectService.archiveDeliverable(token, project.id, deliverable.id))
     setDialog(null)
     setNotice({ severity: 'success', text: `${deliverable.name} was archived.` })
-    result.reload()
+    changed()
   }
 
   /** Save one field changed in place. On a refusal the cell rolls back and this says why. */
@@ -77,7 +84,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     try {
       const updated = await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, changes))
       setNotice({ severity: 'success', text: `${updated.name} was updated.` })
-      result.reload()
+      changed()
     } catch (error) {
       const details = detailsSentence(error, { deliverables: rows })
       setNotice({
@@ -106,7 +113,7 @@ export default function DeliverablesSection({ project, canEdit }) {
     try {
       await api((token) => projectService.updateDeliverable(token, project.id, deliverable.id, { status }))
       setNotice({ severity: 'success', text: `${deliverable.name} is now ${DELIVERABLE_STATUS[status].toLowerCase()}.` })
-      result.reload()
+      changed()
     } catch (error) {
       const details = detailsSentence(error, { deliverables: rows })
       setNotice({

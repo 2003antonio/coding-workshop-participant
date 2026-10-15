@@ -451,3 +451,25 @@ describe('salary data never reaches a non-admin screen', () => {
     expect(screen.queryByText(/6,057\.73/)).not.toBeInTheDocument()
   })
 })
+
+describe('Project detail: one refresh for the whole page', () => {
+  it('editing an assignment updates the header budget without a reload', async () => {
+    const server = signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    const summary = await screen.findByRole('region', { name: 'Budget summary' })
+    const before = (await within(summary).findByText(/^Committed /)).textContent
+    const budgetCalls = server.count('GET', '/api/projects/p-1/budget')
+
+    await user.click(await screen.findByRole('tab', { name: 'People' }))
+    await screen.findByRole('table', { name: 'Assignments' })
+    await user.click(screen.getByRole('button', { name: 'Edit assignment of Eve Employee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit assignment of Eve Employee' })
+    const hours = within(dialog).getByRole('textbox', { name: /hours per week/i })
+    await user.clear(hours)
+    await user.type(hours, '10')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(within(summary).getByText(/^Committed /).textContent).not.toBe(before))
+    expect(server.count('GET', '/api/projects/p-1/budget')).toBeGreaterThan(budgetCalls)
+  })
+})

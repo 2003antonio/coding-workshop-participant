@@ -7,6 +7,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { canSeeSalaries } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
+import { useProjectRefresh } from './projectRefresh'
 import * as allocationService from '../services/allocationService'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
@@ -132,7 +133,13 @@ export default function AllocationsSection({ project, canEdit, role }) {
     (call) => call((token) => allocationService.listAllocations(token, { projectId: project.id })),
     [project.id],
   )
-  const result = useLoad(load)
+  const { refreshKey, refresh } = useProjectRefresh()
+  const result = useLoad(load, refreshKey)
+  // After a change: reload this list, and refresh the rest of the project page (header budget, health strip).
+  const changed = () => {
+    result.reload()
+    refresh()
+  }
 
   // Who can be assigned: admin anyone active; a manager only members of the project's team.
   const loadPeople = useCallback((call) => {
@@ -148,7 +155,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
     const created = await api((token) => allocationService.createAllocation(token, payload))
     setDialog(null)
     setNotice(`${created.employee.name} was assigned.`)
-    result.reload()
+    changed()
   }
 
   async function handleEdit(changes) {
@@ -160,7 +167,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
     await api((token) => allocationService.updateAllocation(token, allocation.id, changes))
     setDialog(null)
     setNotice(`${allocation.employee.name}'s assignment was updated.`)
-    result.reload()
+    changed()
   }
 
   /** Hours changed in place. On a refusal the cell rolls back and this says why (with the weeks over 40 h). */
@@ -170,7 +177,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
     try {
       await api((token) => allocationService.updateAllocation(token, allocation.id, { hours_per_week: hours }))
       setNotice(`${allocation.employee.name}'s assignment was updated.`)
-      result.reload()
+      changed()
     } catch (error) {
       const details = detailsSentence(error)
       setProblem(`${allocation.employee.name}: ${messageFor(error)}${details ? ` ${details}.` : ''} The change was undone.`)
@@ -183,7 +190,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
     await api((token) => allocationService.archiveAllocation(token, allocation.id))
     setDialog(null)
     setNotice(`${allocation.employee.name} was removed from this project.`)
-    result.reload()
+    changed()
   }
 
   const closed = Boolean(project.archived_at) || project.status === 'completed'

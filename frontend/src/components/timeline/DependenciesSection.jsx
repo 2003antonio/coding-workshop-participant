@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import Skeleton from '@mui/material/Skeleton'
 import { useBreakpoint } from '../../hooks/useBreakpoint'
 import { useLoad } from '../../auth/useApi'
+import { useProjectRefresh } from '../projectRefresh'
 import * as reportService from '../../services/reportService'
 import { Empty, LoadError } from '../PageState'
 import DependencyTimeline from './DependencyTimeline'
@@ -32,7 +33,8 @@ export default function DependenciesSection({ project }) {
     (call) => call((token) => reportService.dependencyChain(token, { projectId: project.id })),
     [project.id],
   )
-  const result = useLoad(load)
+  const { refreshKey } = useProjectRefresh()
+  const result = useLoad(load, refreshKey)
 
   if (result.status === 'loading') return <TimelineSkeleton />
   if (result.status === 'error') return <LoadError message={result.error} onRetry={result.reload} />
