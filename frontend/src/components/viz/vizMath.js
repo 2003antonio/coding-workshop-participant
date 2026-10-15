@@ -1,13 +1,20 @@
 // Small pure helpers behind the shared charts and badges (components/viz/).
 import { AVATAR_COLORS } from '../../theme'
 
-/** The same small number for the same text, every time (FNV-1a). */
+/**
+ * The same number for the same text, every time: FNV-1a with a final mix, so
+ * names that differ only near the end still land on different colours. The
+ * seed was picked so the demo projects, teams and Platform people all differ.
+ */
 export function hashText(text = '') {
-  let hash = 2166136261
+  let hash = 912881691
   for (let i = 0; i < text.length; i += 1) {
     hash ^= text.charCodeAt(i)
     hash = Math.imul(hash, 16777619)
   }
+  hash ^= hash >>> 15
+  hash = Math.imul(hash, 0x2c1b3c6d)
+  hash ^= hash >>> 12
   return hash >>> 0
 }
 

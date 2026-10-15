@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { choose, headersOf, renderApp, rowFor } from '../test/renderApp'
+import { VIEW_KEY } from './ProjectsPage'
 
 const projectsTable = () => screen.findByRole('table', { name: 'Projects' })
 const searchBox = () => screen.getByRole('searchbox', { name: 'Search projects' })
@@ -290,5 +291,23 @@ describe('Projects list: actions', () => {
     const list = await screen.findByRole('list', { name: 'Projects' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
     expect(within(list).getByRole('link', { name: 'Billing v2' })).toBeInTheDocument()
+  })
+})
+
+describe('Projects: table or cards', () => {
+  it('starts as a table, switches to cards and remembers the choice', async () => {
+    signedInAs('admin')
+    const { user, unmount } = renderApp('/projects')
+    expect(await screen.findByRole('table', { name: 'Projects' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cards' }))
+    const cards = await screen.findByRole('list', { name: 'Projects' })
+    expect(within(cards).getByRole('link', { name: 'Billing v2' })).toBeInTheDocument()
+    expect(within(cards).getByRole('button', { name: 'Archive Billing v2' })).toBeInTheDocument()
+    expect(window.localStorage.getItem(VIEW_KEY)).toBe('cards')
+
+    unmount()
+    renderApp('/projects')
+    expect(await screen.findByRole('list', { name: 'Projects' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Projects' })).not.toBeInTheDocument()
   })
 })

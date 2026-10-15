@@ -8,10 +8,15 @@ import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
 import Link from '@mui/material/Link'
 import MenuItem from '@mui/material/MenuItem'
+import Paper from '@mui/material/Paper'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import ClearOutlined from '@mui/icons-material/ClearOutlined'
+import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
+import TableRowsOutlined from '@mui/icons-material/TableRowsOutlined'
 import { useMediaQuery } from 'react-responsive'
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateProjects, canManageProject } from '../auth/roles'
@@ -24,6 +29,8 @@ import { LoadState } from '../components/PageState'
 import ProjectFormDialog from '../components/ProjectFormDialog'
 import ResponsiveTable from '../components/ResponsiveTable'
 import StatusChip from '../components/StatusChip'
+import { useMotion } from '../components/motion/motion'
+import ProjectTile, { ProjectName } from '../components/viz/ProjectTile'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { PROJECT_STATUS, formatDate } from './format'
@@ -32,6 +39,55 @@ import { PROJECT_STATUS, formatDate } from './format'
 export const MAX_SEARCH = 100
 /** Wait this long after the last key before searching. */
 export const SEARCH_DELAY_MS = 300
+
+/** Where the table/cards choice is remembered (this browser only). */
+export const VIEW_KEY = 'acme.projects.view'
+
+function savedView() {
+  try {
+    return window.localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'table'
+  } catch {
+    return 'table'
+  }
+}
+
+/** The projects as cards: tile, name, team, status and dates (the same data as the table). */
+function ProjectCards({ rows, empty, archiveButton }) {
+  const motion = useMotion()
+  if (rows.length === 0) return <Typography color="text.secondary" sx={{ py: 3 }}>{empty}</Typography>
+  return (
+    <Box component="ul" aria-label="Projects" sx={{
+      listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 2,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))',
+    }}>
+      {rows.map((p, i) => (
+        <Paper component="li" key={p.id} variant="outlined" sx={[{
+          p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0,
+          transition: 'border-color 150ms, box-shadow 150ms',
+          '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
+        }, motion('enter', i)]}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <ProjectTile name={p.name} size={40} />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.3, overflowWrap: 'anywhere' }}>
+                <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`}>{p.name}</Link>
+              </Typography>
+              <Typography variant="body2" color="text.secondary">{p.team?.name}</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+            <StatusChip status={p.status} />
+            {p.archived_at && <Chip label="Archived" size="small" />}
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 'auto' }}>
+            {formatDate(p.start_date)} – {formatDate(p.end_date)}
+          </Typography>
+          {archiveButton(p) && <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: -1 }}>{archiveButton(p)}</Box>}
+        </Paper>
+      ))}
+    </Box>
+  )
+}
 
 /** All projects the caller can see (§4 visibility), with server-side search, filters and archive. */
 export default function ProjectsPage() {
@@ -54,6 +110,17 @@ export default function ProjectsPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [notice, setNotice] = useState('')
   const [dialog, setDialog] = useState(null) // null, { kind: 'create' } or { kind: 'archive', project }
+  const [view, setView] = useState(savedView) // 'table' (default) or 'cards'
+
+  function changeView(event, next) {
+    if (!next) return
+    setView(next)
+    try {
+      window.localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // Storage can be blocked (private mode): the choice just isn't remembered.
+    }
+  }
 
   // Search on the server, SEARCH_DELAY_MS after the last key. useLoad drops the
   // answer to an older search, so a slow reply never replaces a newer one.
@@ -148,18 +215,34 @@ export default function ProjectsPage() {
         )}
       </Box>
 
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <ToggleButtonGroup size="small" exclusive value={view} onChange={changeView} aria-label="Project view">
+          <ToggleButton value="table" sx={{ gap: 0.75, px: 1.5 }}><TableRowsOutlined fontSize="small" />Table</ToggleButton>
+          <ToggleButton value="cards" sx={{ gap: 0.75, px: 1.5 }}><GridViewOutlined fontSize="small" />Cards</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
       {notice && (
         <Alert severity="success" role="status" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>
       )}
 
       <LoadState result={projects} label="Loading projects" skeleton="table">
         {(rows) => {
+          const archiveButton = (p) => (mayCreate && canManageProject(role, user, p) && !p.archived_at ? (
+            <Button size="small" color="error" aria-label={`Archive ${p.name}`}
+              onClick={() => setDialog({ kind: 'archive', project: p })}>
+              Archive
+            </Button>
+          ) : null)
+          if (view === 'cards') return <ProjectCards rows={rows} empty={emptyText} archiveButton={archiveButton} />
           return (
             <ResponsiveTable label="Projects" rows={rows} empty={emptyText}
               columns={[
                 { key: 'name', label: 'Project', primary: true, render: (p) => (
                   <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`}>{p.name}</Link>
+                    <ProjectName name={p.name}>
+                      <Link component={RouterLink} to={`/projects/${encodeURIComponent(p.id)}`}>{p.name}</Link>
+                    </ProjectName>
                     {p.archived_at && <Chip label="Archived" size="small" />}
                   </Box>
                 ) },
@@ -167,14 +250,7 @@ export default function ProjectsPage() {
                 { key: 'manager', label: 'Manager', render: (p) => p.manager?.name ?? '—' },
                 { key: 'status', label: 'Status', render: (p) => <StatusChip status={p.status} /> },
                 { key: 'dates', label: 'Dates', render: (p) => `${formatDate(p.start_date)} – ${formatDate(p.end_date)}` },
-                { key: 'actions', label: 'Actions', align: 'right', hidden: !mayCreate, render: (p) => (
-                  canManageProject(role, user, p) && !p.archived_at ? (
-                    <Button size="small" color="error" aria-label={`Archive ${p.name}`}
-                      onClick={() => setDialog({ kind: 'archive', project: p })}>
-                      Archive
-                    </Button>
-                  ) : null
-                ) },
+                { key: 'actions', label: 'Actions', align: 'right', hidden: !mayCreate, render: archiveButton },
               ]} />
           )
         }}
