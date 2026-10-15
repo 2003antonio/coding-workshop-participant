@@ -513,3 +513,21 @@ describe('Project detail: row details', () => {
     expect(eve.querySelector('[data-initials="EE"]')).toHaveAttribute('aria-hidden', 'true')
   })
 })
+
+describe('Assign dialog: people grouped by team', () => {
+  it('admin sees the project team first, leads marked, then other teams, then No team', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    await openTab(user, 'People')
+    await user.click(await screen.findByRole('button', { name: 'Assign person' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Assign someone to Billing v2' })
+    await user.click(within(dialog).getByRole('combobox', { name: 'Person' }))
+    const listbox = await screen.findByRole('listbox')
+    const lines = [...listbox.children].map((li) => (li.getAttribute('role') === 'option' ? `  ${li.textContent}` : li.textContent))
+    expect(lines.slice(0, 5)).toEqual(['Platform', '  Max Manager (Delivery Lead) (Lead)', '  Eve Employee (Engineer)',
+      '  Bo Builder (Engineer)', '  Cy Coder (Designer)'])
+    expect(lines.filter((l) => !l.startsWith('  '))).toEqual(['Platform', 'Data', 'No team'])
+    expect(lines).toContain('  Mia Manager (Data Lead) (Lead)')
+    expect(screen.getByRole('option', { name: 'Nia New (Intern)' })).toBeInTheDocument()
+  })
+})

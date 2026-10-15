@@ -38,3 +38,27 @@ export function teamLabel(employee, teams, allTeams = true) {
   const more = led.length > 1 ? ` +${led.length - 1}` : ''
   return { label: `Leads ${led[0].name}${more}`, kind: 'lead' }
 }
+
+/**
+ * The Assign dialog's Person list, grouped by team: the project's team first, then the other
+ * teams by name, then "No team". A person goes under the team they are a member of; a lead
+ * who is no team's member goes under the (first) team they lead, marked lead: true.
+ * Order inside a group is the order given. -> [{ id, name, people: [{ person, lead }] }]
+ */
+export function groupPeople(people, teams, firstTeamId) {
+  const groups = new Map()
+  const add = (team, person, lead) => {
+    const key = team?.id ?? ''
+    if (!groups.has(key)) groups.set(key, { id: key, name: team?.name ?? 'No team', people: [] })
+    groups.get(key).people.push({ person, lead })
+  }
+  for (const person of people) {
+    const member = person.team_id && teams.find((t) => t.id === person.team_id)
+    const led = ledTeams(person.id, teams)[0]
+    if (member) add(member, person, led?.id === member.id)
+    else if (led) add(led, person, true)
+    else add(null, person, false)
+  }
+  const rank = (g) => (g.id === firstTeamId ? 0 : g.id === '' ? 2 : 1)
+  return [...groups.values()].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+}

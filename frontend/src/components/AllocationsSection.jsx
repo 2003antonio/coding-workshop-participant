@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import ListSubheader from '@mui/material/ListSubheader'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
@@ -16,6 +17,7 @@ import { assignedSummary, stillAssigned } from './projectClose'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
 import { formatDate, formatMoney } from '../pages/format'
+import { groupPeople } from '../pages/people'
 import { Masked, RevealButton } from './MaskedMoney'
 import { useRevealSet } from './reveal'
 import { messageFor } from '../pages/apiMessages'
@@ -57,8 +59,21 @@ const fieldProps = (values, setValues, errors) => (name) => ({
   fullWidth: true,
 })
 
+/**
+ * A team name inside the Person list. MUI's Select gives every child role="option" and a
+ * click handler; this drops them, so the header is never a choice and is skipped by the keys.
+ */
+function GroupHeader({ name }) {
+  return (
+    <ListSubheader role="presentation" sx={{ fontWeight: 700, lineHeight: '36px', color: 'text.secondary' }}>
+      {name}
+    </ListSubheader>
+  )
+}
+
 /** Assign one person to this project. onSubmit({ employee_id, project_id, hours_per_week, start_date, end_date }). */
-function AssignDialog({ project, people, onClose, onSubmit }) {
+function AssignDialog({ project, people, teams, onClose, onSubmit }) {
+  const groups = groupPeople(people, teams, project.team.id)
   const [values, setValues] = useState({
     employee_id: '', hours_per_week: '', start_date: project.start_date, end_date: project.end_date,
   })
@@ -81,7 +96,12 @@ function AssignDialog({ project, people, onClose, onSubmit }) {
       <TextField select label="Person" required {...field('employee_id')} sx={{ mt: 1 }}
         helperText={errors.employee_id || ' '}>
         {people.length === 0 && <MenuItem value="" disabled>No one can be assigned</MenuItem>}
-        {people.map((p) => <MenuItem key={p.id} value={p.id}>{p.name} ({p.job_title})</MenuItem>)}
+        {groups.flatMap((g) => [
+          <GroupHeader key={`team-${g.id}`} name={g.name} />,
+          ...g.people.map(({ person: p, lead }) => (
+            <MenuItem key={p.id} value={p.id} sx={{ pl: 3 }}>{p.name} ({p.job_title}){lead && ' (Lead)'}</MenuItem>
+          )),
+        ])}
       </TextField>
       <TextField label="Hours per week" required {...field('hours_per_week')}
         helperText={errors.hours_per_week || HOURS_HELP}
@@ -148,12 +168,18 @@ export default function AllocationsSection({ project, canEdit, role }) {
   }
 
   // Who can be assigned: admin anyone active; a manager only members of the project's team.
-  const loadPeople = useCallback((call) => {
-    if (!canEdit) return Promise.resolve([])
+  // Who can be offered, with the teams to group them by (a manager: only their own team's members).
+  const loadPeople = useCallback(async (call) => {
+    if (!canEdit) return { people: [], teams: [] }
     if (role === 'admin') {
-      return call((token) => employeeService.listEmployees(token)).then((rows) => rows.filter((e) => !e.archived_at))
+      const [rows, teams] = await Promise.all([
+        call((token) => employeeService.listEmployees(token)),
+        call((token) => teamService.listTeams(token)).catch(() => []),
+      ])
+      return { people: rows.filter((e) => !e.archived_at), teams }
     }
-    return call((token) => teamService.getTeam(token, project.team.id)).then((team) => team.members ?? [])
+    const team = await call((token) => teamService.getTeam(token, project.team.id))
+    return { people: (team.members ?? []).map((m) => ({ ...m, team_id: team.id })), teams: [team] }
   }, [canEdit, role, project.team.id])
   const people = useLoad(loadPeople)
 
@@ -278,7 +304,7 @@ export default function AllocationsSection({ project, canEdit, role }) {
         )}
       </LoadState>
       {dialog?.kind === 'assign' && (
-        <AssignDialog project={project} people={people.data} onClose={() => setDialog(null)} onSubmit={handleAssign} />
+        <AssignDialog project={project} people={people.data.people} teams={people.data.teams} onClose={() => setDialog(null)} onSubmit={handleAssign} />
       )}
       {dialog?.kind === 'edit' && (
         <EditAssignmentDialog project={project} allocation={dialog.allocation} onClose={() => setDialog(null)}
