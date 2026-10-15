@@ -378,25 +378,28 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
 | Archive a team | `POST /api/teams/{id}/archive` | Team detail |
 | Team budget for lead and admin (hidden below 3 members) | `GET /api/teams/{id}/budget` | Team detail → budget card |
 | Projects belong to one team, manager = lead | `POST/PUT /api/projects` | Projects page → project form |
-| Role-based project visibility | `GET /api/projects`, `GET /api/projects/{id}` | Projects page |
+| Role-based project visibility | `GET /api/projects`, `GET /api/projects/{id}` | Projects page (`?status=` from a Home card picks the filter) |
 | Search projects by name or description | `GET /api/projects?q=` | Projects page → search box |
 | Planned budget per project (admin and manager) | `POST/PUT /api/projects` (`planned_budget`) | Project form → budget field |
 | Archive a project | `POST /api/projects/{id}/archive` | Project detail |
 | Deliverables with dates | `GET/POST/PUT /api/projects/{id}/deliverables` | Project detail → Deliverables tab |
 | Dependencies, no cycles | `PUT .../deliverables/{id}/dependencies` | Deliverable form → "depends on" picker |
 | Cannot start before dependencies are done | `PUT .../deliverables/{id}` (status) | Deliverables tab → status control |
-| Assign people to projects (manager: own team) | `POST/PUT /api/allocations`, `POST /api/allocations/{id}/archive` | Project detail → Allocations tab |
+| Assign people to projects (manager: own team) | `POST/PUT /api/allocations`, `POST /api/allocations/{id}/archive` | Project detail → People tab |
 | 40 hours per week per person | `POST/PUT /api/allocations` (409 `over_allocated`) | Allocation form → error with weeks |
-| Employee sees own allocations | `GET /api/allocations` | My work page (new screen) |
-| Salary / rate admin-only | all budget endpoints, allocation shape | Budget tab, Employees page |
-| Project budget (managers: totals, hidden below 3 people) | `GET /api/projects/{id}/budget` | Project detail → Budget tab |
+| Employee sees own allocations | `GET /api/allocations`, `GET /api/reports/resource-allocation` | My work page (hours chart + assignments); employee Home (summary and cards, with `GET /api/reports/deliverable-status`) |
+| Salary / rate admin-only | all budget endpoints, allocation shape, `GET /api/employees` | Employees page, employee form, Budget tab cost lines, People tab weekly cost: admin only, masked until the admin clicks the eye (display only; the API response is unchanged) |
+| Project budget (managers: totals, hidden below 3 people) | `GET /api/projects/{id}/budget` | Project detail → header budget bar and Budget tab |
 | Report: project status | `GET /api/reports/project-status` | Reports → Project status |
-| Report: at-risk projects | `GET /api/reports/at-risk-projects` | Reports → At risk (also on dashboard) |
-| Report: resource allocation | `GET /api/reports/resource-allocation` | Reports → Resources (week grid) |
+| Report: at-risk projects | `GET /api/reports/at-risk-projects` | Reports → At risk (also on the admin/manager Home) |
+| Report: resource allocation | `GET /api/reports/resource-allocation` | Reports → Resources (heat-map) |
 | Report: deliverable status | `GET /api/reports/deliverable-status` | Reports → Deliverables |
 | Report: over-allocated people (near capacity, default 32 h) | `GET /api/reports/over-allocated` | Reports → Near capacity |
-| Report: dependency chain | `GET /api/reports/dependency-chain` | Project detail → Dependencies view |
-| Report: budget vs planned budget | `GET /api/reports/budget` | Reports → Budget |
+| Report: dependency chain | `GET /api/reports/dependency-chain` | Project detail → Dependencies tab (timeline); Reports → Dependencies (table) |
+| Report: budget vs planned budget | `GET /api/reports/budget` | Reports → Budget (with the shared budget bar); admin/manager Home → Budget used |
+
+The Home cards link to `/projects?status=active` and `/reports?tab=at-risk|deliverables|budget|near-capacity`;
+unknown values open the defaults. No new endpoints were added for these screens.
 
 ## 11. Known gaps (allowed by design for now)
 
@@ -411,3 +414,7 @@ These are deliberate, tested behaviours that a later block may change:
   is not counted in `member_count` or the team budget, and gets no new allocations.
 - Report 3 with a `team_id` outside the caller's scope returns an empty list rather than `403`.
 - `include_archived` on teams is admin-only (§1).
+- The audit log is written by every change but has no endpoint or screen yet.
+- The admin salary mask is a display guard only: `GET /api/employees`, allocation and budget
+  responses still carry salary, `hourly_rate` and per-person costs for an admin (and never for
+  anyone else).

@@ -14,9 +14,34 @@ an eye on budgets, without letting anyone see a colleague's pay.
 
 The demo runs locally on my laptop (see [How to run locally](#how-to-run-locally)).
 
+Plainly, before you look further:
+- **The cloud deploy was attempted and stopped at database creation**, because the AWS account hit its RDS
+  quota (40 of 40 database clusters already in use in `us-east-2`). So the demo runs locally.
+- **The audit log is written to the database but has no screen yet.**
+- **The salary reveal is a display guard only.** An admin sees salaries and hourly rates masked until they
+  click the eye button, and they mask again after 30 seconds or when the admin leaves the page. This stops
+  someone reading them over the admin's shoulder. The API still sends these figures to an admin (and never
+  to anyone else); the mask does not change what the server sends.
+- A 5-minute walkthrough with exact clicks is in [docs/demo-script.md](./docs/demo-script.md).
+
 ## Screenshots
 
-<!-- FINAL: add 3-4 screenshots from docs/screenshots/ (home, project detail, reports, phone menu) after the new look is captured by `npm run e2e`. -->
+Taken with the seeded demo data on October 14, 2026 (`docs/screenshots/final/`).
+
+| | |
+|---|---|
+| ![Admin Home: five clickable cards, at-risk projects, budget bars](docs/screenshots/final/02-admin-home.png) | ![A project page: the shared budget bar in the header, per-person costs masked](docs/screenshots/final/06-project-budget-bar.png) |
+| Admin Home. Every card is a link to the detail. | Project page. The budget bar says committed against planned and spent so far; per-person costs stay masked until the eye is clicked. |
+| ![Employee Home: one-line summary and four cards](docs/screenshots/final/04-employee-home.png) | ![Reports, Resources: the hours heat-map](docs/screenshots/final/08-reports-heatmap.png) |
+| Employee Home: the coming weeks in one line, then cards that lead to My work and the projects. | Reports, Resources: hours per person per week. |
+| ![Dependencies timeline with the longest chain outlined](docs/screenshots/final/07-dependencies-timeline.png) | ![Employees with salaries masked](docs/screenshots/final/09-employees-masked-salary.png) |
+| The Dependencies tab: a timeline with the longest chain outlined. | Employees (admin): salaries masked until asked for. |
+
+More: [sign-in](docs/screenshots/final/01-login.png), [manager Home](docs/screenshots/final/03-manager-home.png),
+[Projects](docs/screenshots/final/05-projects.png), [phone](docs/screenshots/final/10-phone-home.png),
+[dark mode](docs/screenshots/final/11-dark-home.png), [empty state for someone with no work](docs/screenshots/final/12-empty-state-hal.png),
+[a manager's hidden small-group budget](docs/screenshots/final/13-manager-budget-hidden.png).
+`npm run e2e` also saves every page for every demo account under `docs/screenshots/<account>/`.
 
 ## What it does, by role
 
@@ -27,7 +52,7 @@ The server checks the role on every request; hiding a button in the UI is only a
 |---|---|---|---|
 | Projects they see | All | Projects of the teams they lead | Projects they are assigned to |
 | Change projects, deliverables, assignments | All | Their own teams' projects; they assign only people from their team | Read only |
-| Salaries, hourly rates, per-person costs | Yes (the only role) | Never | Never |
+| Salaries, hourly rates, per-person costs | Yes (the only role), masked until they click the eye | Never | Never |
 | Budgets | All, in full | Project and team totals, hidden when fewer than 3 people are in the group | None |
 | Employees page | Add, edit, archive, set team | Read only, no salaries | Not shown |
 | Teams | Create, choose the lead, add or remove members, archive | See the teams they lead | See their own team |
@@ -74,6 +99,15 @@ coding-workshop-participant/
 ```
 
 ## How to run locally
+
+**Quick start** (after the one-time setup below): `scripts\start-demo.ps1` starts the database
+container, creates the `acme_demo` database if it is missing, starts the backend and the frontend in
+their own windows and opens http://localhost:3000. Add `-Reset` to put the demo data back as seeded.
+It prints the demo e-mail addresses; the passwords are in `.env.local` under `DEMO_*`.
+
+```powershell
+scripts\start-demo.ps1 -Reset
+```
 
 **Prerequisites:** Node.js (I use 24), Python (I use 3.13) with a virtual
 environment in `.venv` at the repo root, and PostgreSQL on this machine (I run
@@ -143,9 +177,9 @@ loops, visibility) through the API and prints one PASS or FAIL line per check.
 ## How to deploy to AWS
 
 **Honest status: the cloud demo is unverified.** I ran the workshop's deploy
-scripts. They got as far as creating the database and then failed on the
-shared account's cluster quota (40 of 40 clusters already in use in
-`us-east-2`). Nothing after that step has run in AWS.
+scripts. They stopped at database creation because the AWS account hit its RDS
+quota (40 of 40 database clusters already in use in `us-east-2`). Nothing after
+that step has run in AWS, so the demo runs locally.
 
 The steps, as the workshop scripts expect them:
 
@@ -168,7 +202,18 @@ Known blockers to check once a cluster is available:
 
 ## Tests
 
-<!-- FINAL: backend (pytest) tests and coverage, frontend (vitest) tests and coverage, E2E result, role smoke result, lint, build size. Re-run everything on this laptop before filling in. -->
+Last full run on this laptop, October 14, 2026 (all from that run):
+
+| Check | Result |
+|---|---|
+| Backend, `pytest` | 739 passed, 99.01% coverage |
+| Frontend, `npm run coverage` (Vitest) | 425 passed in 35 files; 96.02% statements, 91.64% branches, 96.08% functions, 96.87% lines |
+| `npm run lint` | No problems |
+| `npm run build` | Built; main bundle 422.72 kB (137.47 kB gzipped) |
+| End-to-end, Playwright (`e2e/01-pages`, `e2e/02-flows`) | 11 passed |
+| Role smoke, `scripts/smoke_roles.py` | 11 passed, 0 failed |
+
+Both coverage runs fail the build under 80%.
 
 - **Backend:** pytest against a throwaway local database, per service and for the shared kernel.
 - **Frontend:** Vitest + Testing Library. Pages run against a fake backend (`frontend/src/test/fakeApiServer.js`) that follows the API contract and its role rules. Every role, server refusals and phone widths are tested. One test checks that every status colour reaches a 4.5:1 contrast ratio in light and dark.
@@ -189,9 +234,8 @@ Known blockers to check once a cluster is available:
 
 As of October 14, 2026:
 
-- No "My work" page yet: an employee sees their hours project by project, not in one view across all their projects.
-- The project search box filters in the browser. It doesn't use the API's `?q=` search.
-- The audit log is written, but no screen shows it.
+- The audit log is written to the database, but no screen shows it yet.
+- The salary reveal is a display guard only: the API still sends salaries and hourly rates to an admin.
 - Lists are not paginated. The app is sized for demo data.
 - The cloud deploy is unverified (see above). `package-lock.json` is git-ignored, so installs are not pinned.
 
