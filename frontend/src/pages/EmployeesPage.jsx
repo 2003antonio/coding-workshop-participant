@@ -8,9 +8,7 @@ import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
-import FormControlLabel from '@mui/material/FormControlLabel'
 import Paper from '@mui/material/Paper'
-import Switch from '@mui/material/Switch'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -27,6 +25,9 @@ import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
 import MaskedMoney from '../components/MaskedMoney'
 import Paginated from '../components/Paginated'
+import { FilterBar, SearchField, SelectFilter, SwitchFilter } from '../components/filters/Filters'
+import { chosen, emptyText, matches, optionsFrom, optionsOf, searchTerm } from '../components/filters/filterMath'
+import { anyValue, useUrlFilter, useUrlFlag } from '../hooks/useUrlFilter'
 import PageHeader from '../components/PageHeader'
 import { PersonName } from '../components/viz/Avatar'
 import { LoadState } from '../components/PageState'
@@ -39,6 +40,8 @@ import { messageFor } from './employeeMessages'
 import { teamLabel } from './people'
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
+/** The Team filter's choice for people on no team. */
+const NO_TEAM = 'none'
 /** The Team column: a member's team, "Leads <team>" for a lead (filled, secondary colour), or a grey "No team". */
 function TeamChip({ label, kind }) {
   if (kind === 'unknown') {
@@ -106,7 +109,11 @@ export default function EmployeesPage() {
   const allowed = EMPLOYEE_LIST_ROLES.includes(role)
   const isAdmin = canManageEmployees(role)
 
-  const [showArchived, setShowArchived] = useState(false)
+  // Filters in the address (?role=manager&team=…&archived=1) so a link can open them; search stays here.
+  const [showArchived, setShowArchived] = useUrlFlag('archived')
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useUrlFilter('role', Object.keys(ROLE_LABELS))
+  const [teamParam, setTeamFilter] = useUrlFilter('team', anyValue) // a team id, NO_TEAM, or '' for all
   const toast = useToast()
   const [warning, setWarning] = useState('')
   const [problem, setProblem] = useState('') // why an unarchive was refused
@@ -199,6 +206,10 @@ export default function EmployeesPage() {
     )
   }
 
+  const teamOptions = [{ value: NO_TEAM, label: 'No team' },
+    ...optionsFrom(teams ?? [], (t) => ({ value: t.id, label: t.name }))]
+  const teamFilter = chosen(teamParam, teamOptions)
+
   // Columns: email, job title and team move under the name on a phone.
   const columnCount = (isPhone ? 2 : 5) + (isAdmin ? 2 : 0)
 
@@ -207,15 +218,19 @@ export default function EmployeesPage() {
       <PageHeader title="Employees"
         subtitle={isAdmin ? 'Everyone at ACME. Archive people instead of deleting them.' : 'The people in the teams you lead and across ACME.'}
         actions={isAdmin && (
-          <>
-            <FormControlLabel label="Show archived" control={
-              <Switch checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-            } />
-            <Button variant="contained" onClick={() => setDialog({ kind: 'create' })}>
-              Add employee
-            </Button>
-          </>
+          <Button variant="contained" onClick={() => setDialog({ kind: 'create' })}>
+            Add employee
+          </Button>
         )} />
+
+      <FilterBar label="Filter employees" columns={isAdmin ? '2fr 1fr 1fr auto' : '2fr 1fr 1fr'}>
+        <SearchField label="Search employees" value={search} onChange={setSearch} />
+        <SelectFilter label="Role" allLabel="All roles" value={roleFilter} onChange={setRoleFilter}
+          options={optionsOf(ROLE_LABELS)} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamFilter} onChange={setTeamFilter}
+          options={teamOptions} />
+        {isAdmin && <SwitchFilter label="Show archived" checked={showArchived} onChange={setShowArchived} />}
+      </FilterBar>
 
       {problem && (
         <Alert severity="error" role="alert" onClose={() => setProblem('')} sx={{ mb: 2 }}>{problem}</Alert>
@@ -226,7 +241,15 @@ export default function EmployeesPage() {
       )}
 
       <LoadState result={employees} label="Loading employees" skeleton="table">
-        {(rows) => (
+        {(all) => {
+          const term = searchTerm(search)
+          const rows = all.filter((e) => matches(term, e.name, e.email, e.job_title, teamLabel(e, teams ?? [], isAdmin).label)
+            && (!roleFilter || e.role === roleFilter)
+            && (!teamFilter || (teamFilter === NO_TEAM ? !e.team_id : e.team_id === teamFilter)))
+          const empty = emptyText('employees', {
+            term, filtered: Boolean(roleFilter || teamFilter), none: 'No employees to show.',
+          })
+          return (
         <Paginated rows={rows} label="Employees">
         {(pageRows) => (
         <TableContainer component={Paper}>
@@ -245,7 +268,7 @@ export default function EmployeesPage() {
             <TableBody>
               {pageRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={columnCount}>No employees to show.</TableCell>
+                  <TableCell colSpan={columnCount}>{empty}</TableCell>
                 </TableRow>
               )}
               {pageRows.map((employee) => {
@@ -315,7 +338,8 @@ export default function EmployeesPage() {
         </TableContainer>
         )}
         </Paginated>
-        )}
+          )
+        }}
       </LoadState>
 
       {dialog?.kind === 'create' && (

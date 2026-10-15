@@ -183,8 +183,8 @@ describe('Home: card links', () => {
     }
     expect(await linkIn('Active projects')).toHaveAttribute('href', '/projects?status=active')
     expect(await linkIn('At risk')).toHaveAttribute('href', '/reports?tab=at-risk')
-    expect(await linkIn('Overdue deliverables')).toHaveAttribute('href', '/reports?tab=deliverables')
-    expect(await linkIn('Over budget')).toHaveAttribute('href', '/reports?tab=budget')
+    expect(await linkIn('Overdue deliverables')).toHaveAttribute('href', '/reports?tab=deliverables&overdue=1')
+    expect(await linkIn('Over budget')).toHaveAttribute('href', '/reports?tab=budget&over=1')
     expect(await linkIn('Near capacity')).toHaveAttribute('href', '/reports?tab=near-capacity')
     const list = await screen.findByRole('list', { name: 'At-risk projects' })
     expect(within(list).getByRole('link', { name: 'View project Billing v2' })).toHaveAttribute('href', '/projects/p-1')

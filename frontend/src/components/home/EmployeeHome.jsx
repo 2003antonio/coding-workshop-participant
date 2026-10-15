@@ -88,7 +88,7 @@ function StatTiles({ hours, projectCount, next, overdue, today }) {
           </>
         ) : <Typography variant="body2" color="text.secondary">Nothing due on your projects.</Typography>}
       </Tile>
-      <Tile id="tile-overdue" title="Overdue" icon={WarningAmberOutlined} to="/my-work" index={3}>
+      <Tile id="tile-overdue" title="Overdue" icon={WarningAmberOutlined} to="/reports?tab=deliverables&overdue=1" index={3}>
         <Typography {...big} color={overdue > 0 ? 'error.main' : 'text.primary'}>{overdue}</Typography>
         <Typography variant="body2" color={overdue > 0 ? 'error.main' : 'text.secondary'} sx={{ fontWeight: overdue > 0 ? 600 : 400 }}>
           {overdue > 0 ? `${overdue === 1 ? 'deliverable needs' : 'deliverables need'} attention` : 'Nothing overdue'}

@@ -1,5 +1,7 @@
 import Box from '@mui/material/Box'
+import Link from '@mui/material/Link'
 import Typography from '@mui/material/Typography'
+import { Link as RouterLink } from 'react-router-dom'
 import { useMotion } from '../motion/motion'
 
 /** A segment's fill: the status text colour (strong in both modes), from theme.js STATUS_COLORS. */
@@ -13,6 +15,7 @@ const fillSx = (tone) => (theme) => ({
  *   <StatusBar label="Deliverables by status"
  *     segments={[{ key: 'done', label: 'Done', count: 5, tone: 'done' }, ...]} />
  * Empty segments are left out of the bar, and out of the legend unless `showZero`.
+ * A segment with `to` is a link in the legend (e.g. to the list of those projects).
  */
 export default function StatusBar({ label, segments, showZero = false, height = 10, legend = true }) {
   const motion = useMotion()
@@ -38,7 +41,14 @@ export default function StatusBar({ label, segments, showZero = false, height = 
             <Box component="li" key={s.key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Box aria-hidden="true" sx={[fillSx(s.tone), { width: 8, height: 8, borderRadius: '2px', flexShrink: 0 }]} />
               <Typography variant="body2" component="span">
-                {s.label} <Box component="strong" sx={{ fontWeight: 700 }}>{s.count}</Box>
+                {s.to ? (
+                  <Link component={RouterLink} to={s.to} color="inherit" underline="hover"
+                    sx={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
+                    {s.label}&nbsp;<Box component="strong" sx={{ fontWeight: 700 }}>{s.count}</Box>
+                  </Link>
+                ) : (
+                  <>{s.label} <Box component="strong" sx={{ fontWeight: 700 }}>{s.count}</Box></>
+                )}
               </Typography>
             </Box>
           ))}

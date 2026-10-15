@@ -1,24 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import IconButton from '@mui/material/IconButton'
-import InputAdornment from '@mui/material/InputAdornment'
 import Link from '@mui/material/Link'
-import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
-import Switch from '@mui/material/Switch'
-import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
-import ClearOutlined from '@mui/icons-material/ClearOutlined'
 import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
 import TableRowsOutlined from '@mui/icons-material/TableRowsOutlined'
-import { useMediaQuery } from 'react-responsive'
-import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { canCreateProjects, canManageProject } from '../auth/roles'
 import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
@@ -36,13 +28,11 @@ import ProjectTile, { ProjectName } from '../components/viz/ProjectTile'
 import * as projectService from '../services/projectService'
 import * as teamService from '../services/teamService'
 import { MUTED_ROW_SX, clickableCardSx } from '../theme'
+import { FilterBar, SearchField, SelectFilter, SwitchFilter } from '../components/filters/Filters'
+import { SEARCH_DELAY_MS, emptyText, optionsOf, searchTerm } from '../components/filters/filterMath'
+import { anyValue, useUrlFilter, useUrlFlag } from '../hooks/useUrlFilter'
 import { messageFor } from './apiMessages'
 import { PROJECT_STATUS, formatDate } from './format'
-
-/** The server's limit for the search text (§4). */
-export const MAX_SEARCH = 100
-/** Wait this long after the last key before searching. */
-export const SEARCH_DELAY_MS = 300
 
 /** Where the table/cards choice is remembered (this browser only). */
 export const VIEW_KEY = 'acme.projects.view'
@@ -96,20 +86,15 @@ export default function ProjectsPage() {
   const { user, role } = useAuth()
   const api = useApi()
   const navigate = useNavigate()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
   const mayCreate = canCreateProjects(role)
 
   const [search, setSearch] = useState('') // what is in the box
   const [query, setQuery] = useState('') // what was last sent as q (trimmed)
-  const searchBox = useRef(null)
-  const [params] = useSearchParams()
-  // ?status=active (from a Home card) picks the filter on first load; anything unknown means all.
-  const [status, setStatus] = useState(() => {
-    const asked = params.get('status') ?? ''
-    return Object.hasOwn(PROJECT_STATUS, asked) ? asked : ''
-  })
-  const [teamId, setTeamId] = useState('')
-  const [showArchived, setShowArchived] = useState(false)
+  // The filters live in the address (?status=active&team=…&archived=1), so Home's cards can
+  // open the list filtered; an unknown status means all. The team goes to the server as asked.
+  const [status, setStatus] = useUrlFilter('status', Object.keys(PROJECT_STATUS))
+  const [teamId, setTeamId] = useUrlFilter('team', anyValue)
+  const [showArchived, setShowArchived] = useUrlFlag('archived')
   const toast = useToast()
   const [problem, setProblem] = useState('') // why an unarchive was refused
   const [restoring, setRestoring] = useState(null) // id of the project being unarchived
@@ -129,7 +114,7 @@ export default function ProjectsPage() {
   // Search on the server, SEARCH_DELAY_MS after the last key. useLoad drops the
   // answer to an older search, so a slow reply never replaces a newer one.
   useEffect(() => {
-    const timer = setTimeout(() => setQuery(search.trim().slice(0, MAX_SEARCH)), SEARCH_DELAY_MS)
+    const timer = setTimeout(() => setQuery(searchTerm(search)), SEARCH_DELAY_MS)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -154,13 +139,12 @@ export default function ProjectsPage() {
 
   function clearSearch() {
     setSearch('')
-    setQuery('')
-    searchBox.current?.focus()
+    setQuery('') // at once, not after the search delay
   }
 
-  let emptyText = 'No projects to show yet.'
-  if (query) emptyText = `No projects match '${query}'.`
-  else if (status || teamId) emptyText = 'No projects match these filters.'
+  const emptyMessage = emptyText('projects', {
+    term: query, filtered: Boolean(status || teamId), none: 'No projects to show yet.',
+  })
 
   async function handleCreate(payload) {
     const created = await api((token) => projectService.createProject(token, payload))
@@ -199,40 +183,14 @@ export default function ProjectsPage() {
           </Button>
         )} />
 
-      <Box role="search" aria-label="Filter projects" sx={{
-        display: 'grid', gap: 2, mb: 2, alignItems: 'center',
-        gridTemplateColumns: isPhone ? '1fr' : '2fr 1fr 1fr auto',
-      }}>
-        <TextField label="Search projects" type="search" size="small" value={search} inputRef={searchBox}
-          onChange={(e) => setSearch(e.target.value)}
-          slotProps={{
-            htmlInput: { maxLength: MAX_SEARCH },
-            input: search ? {
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton aria-label="Clear search" edge="end" onClick={clearSearch} sx={{ width: 44, height: 44 }}>
-                    <ClearOutlined fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            } : undefined,
-          }} />
-        <TextField select label="Status" size="small" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <MenuItem value="">All statuses</MenuItem>
-          {Object.entries(PROJECT_STATUS).map(([value, label]) => (
-            <MenuItem key={value} value={value}>{label}</MenuItem>
-          ))}
-        </TextField>
-        <TextField select label="Team" size="small" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-          <MenuItem value="">All teams</MenuItem>
-          {teamOptions.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
-        </TextField>
-        {mayCreate && (
-          <FormControlLabel label="Show archived" control={
-            <Switch checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-          } />
-        )}
-      </Box>
+      <FilterBar label="Filter projects" columns={mayCreate ? '2fr 1fr 1fr auto' : '2fr 1fr 1fr'}>
+        <SearchField label="Search projects" value={search} onChange={setSearch} onClear={clearSearch} />
+        <SelectFilter label="Status" allLabel="All statuses" value={status} onChange={setStatus}
+          options={optionsOf(PROJECT_STATUS)} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
+          options={teamOptions.map((t) => ({ value: t.id, label: t.name }))} />
+        {mayCreate && <SwitchFilter label="Show archived" checked={showArchived} onChange={setShowArchived} />}
+      </FilterBar>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <ToggleButtonGroup size="small" exclusive value={view} onChange={changeView} aria-label="Project view">
@@ -262,9 +220,9 @@ export default function ProjectsPage() {
               </Button>
             )
           }
-          if (view === 'cards') return <ProjectCards rows={rows} empty={emptyText} archiveButton={archiveButton} />
+          if (view === 'cards') return <ProjectCards rows={rows} empty={emptyMessage} archiveButton={archiveButton} />
           return (
-            <ResponsiveTable label="Projects" rows={rows} empty={emptyText} muted={(p) => Boolean(p.archived_at)}
+            <ResponsiveTable label="Projects" rows={rows} empty={emptyMessage} muted={(p) => Boolean(p.archived_at)}
               columns={[
                 { key: 'name', label: 'Project', primary: true, render: (p) => (
                   <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
