@@ -26,6 +26,7 @@ import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
 import MaskedMoney from '../components/MaskedMoney'
+import Paginated from '../components/Paginated'
 import PageHeader from '../components/PageHeader'
 import { PersonName } from '../components/viz/Avatar'
 import { LoadState } from '../components/PageState'
@@ -226,6 +227,8 @@ export default function EmployeesPage() {
 
       <LoadState result={employees} label="Loading employees" skeleton="table">
         {(rows) => (
+        <Paginated rows={rows} label="Employees">
+        {(pageRows) => (
         <TableContainer component={Paper}>
           <Table aria-label="Employees" size={isPhone ? 'small' : 'medium'}>
             <TableHead>
@@ -240,12 +243,12 @@ export default function EmployeesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.length === 0 && (
+              {pageRows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={columnCount}>No employees to show.</TableCell>
                 </TableRow>
               )}
-              {rows.map((employee) => {
+              {pageRows.map((employee) => {
                 const archived = Boolean(employee.archived_at)
                 const isSelf = employee.id === user?.id
                 return (
@@ -310,6 +313,8 @@ export default function EmployeesPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        )}
+        </Paginated>
         )}
       </LoadState>
 

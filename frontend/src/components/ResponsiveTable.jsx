@@ -9,6 +9,7 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import { useMediaQuery } from 'react-responsive'
 import EmptyState from './EmptyState'
+import Paginated from './Paginated'
 import { MUTED_ROW_SX } from '../theme'
 
 /**
@@ -18,8 +19,10 @@ import { MUTED_ROW_SX } from '../theme'
  * `accent(row)` may name a status tone (theme.js STATUS_COLORS) for a colour stripe
  * on the row's left edge; the row's own words still say the status.
  * `muted(row)` true greys a row out (e.g. an archived one; its own chip says "Archived").
+ * More rows than `pageSize` (default 25) are shown a page at a time (components/Paginated.jsx).
  */
-export default function ResponsiveTable({ label, columns, rows, empty, rowKey = (row) => row.id, accent, muted }) {
+export default function ResponsiveTable({ label, columns, rows, empty, rowKey = (row) => row.id, accent, muted,
+  pageSize }) {
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const shown = columns.filter((c) => !c.hidden)
   const primary = shown.find((c) => c.primary) ?? shown[0]
@@ -35,28 +38,26 @@ export default function ResponsiveTable({ label, columns, rows, empty, rowKey = 
     return <EmptyState compact title={empty} />
   }
 
-  if (isPhone) {
-    return (
-      <Box component="ul" aria-label={label} sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 1.5 }}>
-        {rows.map((row) => (
-          <Paper component="li" key={rowKey(row)} variant="outlined" data-accent={accent?.(row)}
-            data-muted={muted?.(row) || undefined} sx={[{ p: 2 }, stripe(row, 4), dim(row)]}>
-            <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600 }}>{primary.render(row)}</Typography>
-            <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5 }}>
-              {shown.filter((c) => c !== primary).map((c) => (
-                <Box key={c.key} sx={{ display: 'contents' }}>
-                  <Typography component="dt" variant="body2" color="text.secondary">{c.label}</Typography>
-                  <Typography component="dd" variant="body2" sx={{ m: 0 }}>{c.render(row)}</Typography>
-                </Box>
-              ))}
-            </Box>
-          </Paper>
-        ))}
-      </Box>
-    )
-  }
+  const cards = (pageRows) => (
+    <Box component="ul" aria-label={label} sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 1.5 }}>
+      {pageRows.map((row) => (
+        <Paper component="li" key={rowKey(row)} variant="outlined" data-accent={accent?.(row)}
+          data-muted={muted?.(row) || undefined} sx={[{ p: 2 }, stripe(row, 4), dim(row)]}>
+          <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600 }}>{primary.render(row)}</Typography>
+          <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5 }}>
+            {shown.filter((c) => c !== primary).map((c) => (
+              <Box key={c.key} sx={{ display: 'contents' }}>
+                <Typography component="dt" variant="body2" color="text.secondary">{c.label}</Typography>
+                <Typography component="dd" variant="body2" sx={{ m: 0 }}>{c.render(row)}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      ))}
+    </Box>
+  )
 
-  return (
+  const table = (pageRows) => (
     <TableContainer component={Paper}>
       <Table aria-label={label}>
         <TableHead>
@@ -65,7 +66,7 @@ export default function ResponsiveTable({ label, columns, rows, empty, rowKey = 
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row) => (
+          {pageRows.map((row) => (
             <TableRow key={rowKey(row)} hover data-accent={accent?.(row)} data-muted={muted?.(row) || undefined}
               sx={dim(row)}>
               {shown.map((c, i) => (c === primary ? (
@@ -80,5 +81,11 @@ export default function ResponsiveTable({ label, columns, rows, empty, rowKey = 
         </TableBody>
       </Table>
     </TableContainer>
+  )
+
+  return (
+    <Paginated rows={rows} label={label} pageSize={pageSize}>
+      {(pageRows) => (isPhone ? cards(pageRows) : table(pageRows))}
+    </Paginated>
   )
 }

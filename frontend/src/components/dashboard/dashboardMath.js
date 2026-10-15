@@ -91,3 +91,22 @@ export function portfolioHealth(statusData, riskData, budgetData) {
   }
   return { ...counts, hidden: budgetData.projects.filter((p) => p.hidden_reason).length }
 }
+
+/** Rows a dashboard list shows (like COMING_UP_LIMIT); a "View all" link leads to the full report. */
+export const DASHBOARD_LIST_LIMIT = 6
+
+/** At-risk projects worth a look first: the most reasons first (ties keep the report's order). */
+export function topAtRisk(projects, limit = DASHBOARD_LIST_LIMIT) {
+  return [...projects].sort((a, b) => b.reasons.length - a.reasons.length).slice(0, limit)
+}
+
+const BUDGET_RANK = { over: 0, close: 1, ok: 2, none: 3, hidden: 4 }
+/** Budget bars worth a look first: over, then close, then the rest; the most committed first within each. */
+export function topBudgets(projects, limit = DASHBOARD_LIST_LIMIT) {
+  return projects
+    .map((p) => ({ p, state: budgetState(p) }))
+    .sort((a, b) => BUDGET_RANK[a.state.kind] - BUDGET_RANK[b.state.kind]
+      || (b.state.committedPct ?? -1) - (a.state.committedPct ?? -1))
+    .slice(0, limit)
+    .map(({ p }) => p)
+}
