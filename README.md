@@ -199,6 +199,7 @@ The steps, as the workshop scripts expect them:
 1. `./scripts/sync-common.sh` copies `backend/common/` into every service folder. **Run it first, every time.** The copies are git-ignored, and a Lambda without them fails to start.
 2. `./bin/deploy-backend.sh aws`: Terraform creates the network, the database, one Lambda per service folder (found by its `requirements.txt`) and the CloudFront routes `/api/<service>*`.
 3. `./bin/deploy-frontend.sh` builds the frontend and uploads it to S3 behind CloudFront.
+4. `./scripts/seed-cloud.sh` seeds the demo organisation into the cloud database, with the same accounts and `DEMO_*_PASSWORD` passwords as `scripts/seed_demo.py` locally. The cloud database only accepts connections from the Lambdas, so the seed runs inside the auth Lambda through a direct `aws lambda invoke` (an event without `requestContext`, which the public URL can never send). Safe to re-run: if the demo admin exists, nothing changes. `--bulk` also adds the large demo (`backend/common/demo_bulk.py`: 500 people in 30 tech teams, 210 projects with deliverables and assignments that follow every API rule); they sign in as `first.last@acme-demo.test` with their role's password. `--reset` removes all demo data first (refused if any account is outside `@acme-demo.test`). Locally: `scripts/seed_demo.py --bulk`.
 
 Deploy all six services together. The newer services need migrations 002 to 006,
 and the first cold start of any service applies pending migrations (so the
@@ -211,7 +212,7 @@ Known blockers to check once a cluster is available:
 - **The `Authorization` header.** Every request carries `Authorization: Bearer <token>`. It must reach the Lambda through CloudFront unchanged. Not yet tested.
 - **The API address.** The frontend calls `http://localhost:3001` unless `VITE_API_URL` is set when it is built. For AWS it has to point at the CloudFront address. (`frontend/.env.sample` still names old `REACT_APP_*` variables, which Vite ignores.)
 - **Lambda memory.** Terraform gives each Lambda 128 MB. Password checking uses scrypt, which needs about 16 MiB (64 MiB is only the cap set in `auth.py`), so sign-in may need more memory. Not measured.
-- **No admin on a fresh cloud database.** There is no public way to create the first account. `scripts/seed_admin.py --allow-remote` can do it, but only from a machine that can reach the database inside its private network.
+- **No admin on a fresh cloud database.** There is no public way to create the first account. Step 4 (`scripts/seed-cloud.sh`) creates the demo accounts from inside the auth Lambda. `scripts/seed_admin.py --allow-remote` only works from a machine the database's security group admits, and the workshop machine is not one of them.
 
 ## Tests
 
