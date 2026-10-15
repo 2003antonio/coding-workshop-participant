@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -20,12 +20,12 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import { useMediaQuery } from 'react-responsive'
 import { EMPLOYEE_LIST_ROLES, canManageEmployees } from '../auth/roles'
+import { useApi, useLoad } from '../auth/useApi'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
-import { LoadingSkeleton } from '../components/PageState'
+import { LoadState } from '../components/PageState'
 import * as employeeService from '../services/employeeService'
-import { withSessionRetry } from '../services/sessionRetry'
 import * as teamService from '../services/teamService'
 import { messageFor as teamMessageFor } from './apiMessages'
 import { messageFor } from './employeeMessages'
@@ -75,63 +75,43 @@ function ArchiveDialog({ employee, onClose, onConfirm }) {
  * and the Add / Edit / Archive buttons. The server enforces the same rules.
  */
 export default function EmployeesPage() {
-  const { user, role, getAccessToken, refreshSession } = useAuth()
+  const { user, role } = useAuth()
   const isPhone = useMediaQuery({ maxWidth: 599 })
   const allowed = EMPLOYEE_LIST_ROLES.includes(role)
   const isAdmin = canManageEmployees(role)
 
-  const [employees, setEmployees] = useState([])
-  const [loadState, setLoadState] = useState('loading') // 'loading' | 'ready' | 'error'
-  const [loadError, setLoadError] = useState('')
   const [showArchived, setShowArchived] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
   const [notice, setNotice] = useState('')
   const [warning, setWarning] = useState('')
-  const [teams, setTeams] = useState(null) // null until loaded (or if loading failed)
   // null, { kind: 'create' }, { kind: 'edit', employee } or { kind: 'archive', employee }
   const [dialog, setDialog] = useState(null)
 
-  const api = useCallback(
-    (call) => withSessionRetry(call, { getAccessToken, refreshSession }),
-    [getAccessToken, refreshSession],
-  )
+  const api = useApi()
 
-  useEffect(() => {
-    if (!allowed) return undefined
-    let cancelled = false
-    api((token) => employeeService.listEmployees(token, { includeArchived: isAdmin && showArchived }))
-      .then((rows) => {
-        if (cancelled) return
-        setEmployees(rows)
-        setLoadState('ready')
-      })
-      .catch((error) => {
-        if (cancelled) return
-        setLoadError(messageFor(error))
-        setLoadState('error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [allowed, api, isAdmin, showArchived, reloadKey])
+  // The list: skeleton while loading, a fixed message and "Try again" on failure.
+  // Nothing is requested for a role that may not see it.
+  const loadEmployees = useCallback(
+    (call) => (allowed
+      ? call((token) => employeeService.listEmployees(token, { includeArchived: isAdmin && showArchived }))
+      : Promise.resolve([])),
+    [allowed, isAdmin, showArchived],
+  )
+  const employees = useLoad(loadEmployees)
 
   // Team names for the Team column and the form. A manager gets only the teams they lead.
-  useEffect(() => {
-    if (!allowed) return undefined
-    let cancelled = false
-    api((token) => teamService.listTeams(token))
-      .then((rows) => { if (!cancelled) setTeams(rows) })
-      .catch(() => { if (!cancelled) setTeams(null) })
-    return () => {
-      cancelled = true
-    }
-  }, [allowed, api, reloadKey])
+  const loadTeams = useCallback(
+    (call) => (allowed ? call((token) => teamService.listTeams(token)) : Promise.resolve([])),
+    [allowed],
+  )
+  const teamsResult = useLoad(loadTeams)
+  const teams = teamsResult.status === 'ready' ? teamsResult.data : null // null until loaded (or if loading failed)
 
   function finish(message, teamWarning = '') {
     setDialog(null)
     setNotice(message)
     setWarning(teamWarning)
-    setReloadKey((key) => key + 1)
+    employees.reload()
+    teamsResult.reload()
   }
 
   /**
@@ -210,12 +190,8 @@ export default function EmployeesPage() {
         <Alert severity="warning" onClose={() => setWarning('')} sx={{ mb: 2 }}>{warning}</Alert>
       )}
 
-      {loadState === 'loading' && (
-        <LoadingSkeleton variant="table" label="Loading employees" />
-      )}
-      {loadState === 'error' && <Alert severity="error">{loadError}</Alert>}
-
-      {loadState === 'ready' && (
+      <LoadState result={employees} label="Loading employees" skeleton="table">
+        {(rows) => (
         <TableContainer component={Paper}>
           <Table aria-label="Employees" size={isPhone ? 'small' : 'medium'}>
             <TableHead>
@@ -230,12 +206,12 @@ export default function EmployeesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {employees.length === 0 && (
+              {rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={columnCount}>No employees to show.</TableCell>
                 </TableRow>
               )}
-              {employees.map((employee) => {
+              {rows.map((employee) => {
                 const archived = Boolean(employee.archived_at)
                 const isSelf = employee.id === user?.id
                 return (
@@ -283,7 +259,8 @@ export default function EmployeesPage() {
             </TableBody>
           </Table>
         </TableContainer>
-      )}
+        )}
+      </LoadState>
 
       {dialog?.kind === 'create' && (
         <EmployeeFormDialog teams={teams} onClose={() => setDialog(null)} onSubmit={handleCreate} />

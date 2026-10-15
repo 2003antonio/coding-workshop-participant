@@ -173,6 +173,26 @@ describe('errors', () => {
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
     expect(screen.queryByText(/raw: salary column/)).not.toBeInTheDocument()
   })
+
+  it('shows a skeleton while loading, and "Try again" after a failure loads the list again', async () => {
+    let listCalls = 0
+    const server = signedInAs('admin', {
+      'GET /api/employees/': () => {
+        listCalls += 1
+        return listCalls === 1 ? reply(503, { error: { code: 'unavailable', message: 'raw: down' } }) : reply(200, listFor('admin'))
+      },
+    })
+    renderApp('/employees')
+    expect(await screen.findByRole('status', { name: 'Loading employees' })).toHaveAttribute('aria-busy', 'true')
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await table()).toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByText('90,000.50')).toBeInTheDocument()
+    expect(server.count('GET', '/api/employees/')).toBe(2)
+    expect(screen.queryByText('Something went wrong. Please try again.')).not.toBeInTheDocument()
+  })
 })
 
 describe('admin actions', () => {
