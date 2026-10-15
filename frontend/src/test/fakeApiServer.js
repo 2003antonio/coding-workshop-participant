@@ -10,6 +10,7 @@
 //   server.calls, server.count(method, path), server.db
 import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
 import { fakeAuthServer, reply } from './fakeAuthServer'
+import { extraRoutes } from './fakeHandlers'
 
 export { reply }
 
@@ -309,7 +310,7 @@ function createApi(db, meId, today) {
   }
 
   // [method, pattern, handler({ body, query, params })]
-  return [
+  const coreRoutes = [
     // ---- employees (the parts pages use) ----
     ['GET', /^\/api\/employees\/$/, ({ query }) => {
       if (me().role === 'employee') return forbidden()
@@ -328,6 +329,13 @@ function createApi(db, meId, today) {
       if (!row) return notFound()
       if (body.role === 'employee' && db.teams.some((t) => active(t) && t.lead_id === row.id)) return err(409, 'leads_team')
       Object.assign(row, body)
+      return reply(200, employeeView(row))
+    }],
+    ['POST', /^\/api\/employees\/(?<id>[^/]+)\/unarchive$/, ({ params }) => {
+      if (!isAdmin()) return forbidden()
+      const row = byId('employees', params.id)
+      if (!row || !row.archived_at) return notFound()
+      row.archived_at = null
       return reply(200, employeeView(row))
     }],
 
@@ -436,6 +444,15 @@ function createApi(db, meId, today) {
       if (!canManageProject(project)) return forbidden()
       if (project.archived_at) return err(409, 'already_archived')
       project.archived_at = `${today}T12:00:00+00:00`
+      return reply(200, projectView(project))
+    }],
+    ['POST', /^\/api\/projects\/(?<id>[^/]+)\/unarchive$/, ({ params }) => {
+      const project = visibleProject(params.id)
+      if (!project) return notFound()
+      if (!canManageProject(project)) return forbidden()
+      if (!project.archived_at) return notFound()
+      if (!active(byId('teams', project.team_id))) return err(409, 'team_archived')
+      project.archived_at = null
       return reply(200, projectView(project))
     }],
     ['GET', /^\/api\/projects\/(?<id>[^/]+)\/budget$/, ({ params }) => {
@@ -666,6 +683,10 @@ function createApi(db, meId, today) {
       })
     }],
   ]
+  // Plug-in routes from fakeHandlers/ also get the data, the signed-in user and today.
+  const context = { db, me, today }
+  const plugged = extraRoutes.map(([method, pattern, handler]) => [method, pattern, (req) => handler({ ...req, ...context })])
+  return [...coreRoutes, ...plugged]
 }
 
 /**

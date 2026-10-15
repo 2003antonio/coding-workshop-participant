@@ -26,12 +26,17 @@ function Figures({ figures }) {
  * `summary` (e.g. a typed planned budget, which is not pay data) and `status`
  * (e.g. the over-budget flag) are shown above and below the figures.
  */
-export default function BudgetPanel({ title, summary, figures, status, hiddenReason, footnote, children }) {
+export default function BudgetPanel({ title, summary, figures, status, hiddenReason, footnote, updating = false, children }) {
   const hidden = Boolean(hiddenReason)
     || figures.some(([, amount, text]) => text === undefined && (amount === null || amount === undefined))
   return (
     <Paper component="section" aria-label={title} variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="h6" component="h2" gutterBottom>{title}</Typography>
+      <Typography variant="h6" component="h2" gutterBottom>
+        {title}
+        {updating && (
+          <Typography component="span" variant="caption" color="text.secondary" role="status" sx={{ ml: 1 }}>Updating…</Typography>
+        )}
+      </Typography>
       {summary && <Box sx={{ mb: 2 }}><Figures figures={summary} /></Box>}
       {hidden ? (
         <Alert severity="info">{hiddenMessage(hiddenReason)}</Alert>

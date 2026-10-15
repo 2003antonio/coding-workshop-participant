@@ -263,3 +263,7 @@ tfplan
 
 # Per-service copies of backend/common (made by scripts/sync-common.sh; edit backend/common only)
 backend/*/common/
+
+# E2E saves every page per account here on each run; only final/ is curated and committed.
+/docs/screenshots/*/
+!/docs/screenshots/final/

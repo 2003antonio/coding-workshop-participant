@@ -9,10 +9,13 @@ import DialogTitle from '@mui/material/DialogTitle'
 import { messageFor } from '../pages/apiMessages'
 
 /**
- * Ask before a change that is hard to undo. onConfirm() returns a promise; if it
- * rejects, the dialog stays open with a friendly message.
+ * Ask before a change that is hard to undo (confirmColor 'error' by default; 'primary' for a safe one). onConfirm() returns a promise; if it
+ * rejects, the dialog stays open with a friendly message (or the error's own `sentence`).
+ * `children` go under the description (e.g. a checkbox).
  */
-export default function ConfirmDialog({ title, description, confirmLabel, onClose, onConfirm }) {
+export default function ConfirmDialog({
+  title, description, confirmLabel, confirmColor = 'error', onClose, onConfirm, children,
+}) {
   const id = useId()
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -23,7 +26,7 @@ export default function ConfirmDialog({ title, description, confirmLabel, onClos
     try {
       await onConfirm()
     } catch (err) {
-      setError(messageFor(err))
+      setError(err?.sentence ?? messageFor(err))
       setSubmitting(false)
     }
   }
@@ -34,11 +37,12 @@ export default function ConfirmDialog({ title, description, confirmLabel, onClos
       <DialogTitle id={`${id}-title`}>{title}</DialogTitle>
       <DialogContent>
         <DialogContentText id={`${id}-description`}>{description}</DialogContentText>
+        {children}
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={submitting}>Cancel</Button>
-        <Button color="error" variant="contained" onClick={handleConfirm} disabled={submitting}>
+        <Button color={confirmColor} variant="contained" onClick={handleConfirm} disabled={submitting}>
           {confirmLabel}
         </Button>
       </DialogActions>

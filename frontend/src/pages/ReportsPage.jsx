@@ -2,12 +2,11 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
-import Typography from '@mui/material/Typography'
-import { useMediaQuery } from 'react-responsive'
 import { useSearchParams } from 'react-router-dom'
 import { reportsFor } from '../auth/roles'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
+import PageHeader from '../components/PageHeader'
 import {
   AtRiskReport, BudgetReport, CapacityReport, ChainReport, DeliverablesReport, ProjectStatusReport, ResourcesReport,
 } from '../components/ReportViews'
@@ -22,18 +21,28 @@ const REPORTS = {
   budget: { label: 'Budget', View: BudgetReport },
 }
 
-/** All reports the caller's role may open, one per tab (?report=<key> keeps the choice in the URL). */
+/** Readable names for ?tab= (Home's cards link to /reports?tab=at-risk and so on). */
+const TAB_SLUGS = {
+  'project-status': 'status', 'at-risk': 'risk', resources: 'resources', deliverables: 'deliverables',
+  'near-capacity': 'capacity', dependencies: 'chain', budget: 'budget',
+}
+
+/**
+ * All reports the caller's role may open, one per tab (?report=<key> keeps the choice in the URL;
+ * ?tab=<slug> opens one too). A report the role may not open, or an unknown name, opens the first tab.
+ */
 export default function ReportsPage() {
   const { role } = useAuth()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
   const [params, setParams] = useSearchParams()
   const allowed = reportsFor(role)
-  const current = allowed.includes(params.get('report')) ? params.get('report') : allowed[0]
+  const tab = params.get('tab') ?? ''
+  const asked = params.get('report') ?? (Object.hasOwn(TAB_SLUGS, tab) ? TAB_SLUGS[tab] : null)
+  const current = allowed.includes(asked) ? asked : allowed[0]
   const { View } = REPORTS[current]
 
   return (
-    <AppShell maxWidth="lg">
-      <Typography variant={isPhone ? 'h5' : 'h4'} component="h1" sx={{ mb: 2 }}>Reports</Typography>
+    <AppShell>
+      <PageHeader title="Reports" subtitle="Status, risk, people and money across the projects you can see." />
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={current} onChange={(event, value) => setParams({ report: value }, { replace: true })}
           aria-label="Reports" variant="scrollable" allowScrollButtonsMobile>

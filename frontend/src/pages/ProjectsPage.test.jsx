@@ -1,9 +1,43 @@
-import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { choose, headersOf, renderApp, rowFor } from '../test/renderApp'
+import { VIEW_KEY } from './ProjectsPage'
 
 const projectsTable = () => screen.findByRole('table', { name: 'Projects' })
+const searchBox = () => screen.getByRole('searchbox', { name: 'Search projects' })
+/** The q of every project list request so far (null when none was sent). */
+const sentQueries = (server) => server.calls.filter((c) => c.path === '/api/projects/' && c.method === 'GET')
+  .map((c) => new URLSearchParams(c.query).get('q'))
+
+const team = { id: 't-1', name: 'Platform' }
+const VISIBLE = [
+  { id: 'p-1', team, manager: { id: 'u-2', name: 'Max Manager' }, name: 'Billing v2', description: 'New invoices',
+    status: 'active', start_date: '2026-11-02', end_date: '2027-03-31', archived_at: null, planned_budget: 12000 },
+  { id: 'p-2', team: { id: 't-2', name: 'Data' }, manager: { id: 'u-6', name: 'Mia Manager' }, name: 'Data Lake',
+    description: '', status: 'planned', start_date: '2026-11-02', end_date: '2027-02-26', archived_at: null, planned_budget: null },
+]
+/**
+ * Signed in as admin, with GET /api/projects/ searching like the server (§4):
+ * q matches name or description, case-insensitive. hold(q, answer) may return
+ * a promise to answer later (a slow reply).
+ */
+function searchable({ hold } = {}) {
+  const server = signedInAs('admin', {
+    routes: {
+      'GET /api/projects/': () => {
+        const q = new URLSearchParams(server.calls.at(-1).query).get('q')
+        const needle = q?.toLowerCase()
+        const rows = VISIBLE.filter((p) => !needle || `${p.name}
+${p.description}`.toLowerCase().includes(needle))
+        const answer = reply(200, { projects: rows })
+        return hold ? hold(q, answer) : answer
+      },
+    },
+  })
+  return server
+}
+
 const lastList = (server) => server.calls.filter((c) => c.path === '/api/projects/' && c.method === 'GET').at(-1)
 
 describe('Projects list: what each role sees', () => {
@@ -50,22 +84,6 @@ describe('Projects list: what each role sees', () => {
 })
 
 describe('Projects list: search and filters', () => {
-  it('search narrows the list by name or description without a request', async () => {
-    const server = signedInAs('admin')
-    const { user } = renderApp('/projects')
-    await projectsTable()
-    const before = server.calls.length
-
-    await user.type(screen.getByRole('searchbox', { name: 'Search projects' }), 'invoices')
-    expect(rowFor('Billing v2')).toBeInTheDocument()
-    expect(screen.queryByText('Data Lake')).not.toBeInTheDocument()
-
-    await user.clear(screen.getByRole('searchbox', { name: 'Search projects' }))
-    await user.type(screen.getByRole('searchbox', { name: 'Search projects' }), 'zzz')
-    expect(screen.getByText('No projects match these filters.')).toBeInTheDocument()
-    expect(server.calls.length).toBe(before)
-  })
-
   it('status and team filters ask the server', async () => {
     const server = signedInAs('admin')
     const { user } = renderApp('/projects')
@@ -89,7 +107,93 @@ describe('Projects list: search and filters', () => {
     await user.click(screen.getByRole('switch', { name: 'Show archived' }))
     await waitFor(() => expect(within(rowFor('Old Portal')).getByText('Archived')).toBeInTheDocument())
     expect(lastList(server).query).toBe('?include_archived=true')
-    expect(within(rowFor('Old Portal')).queryByRole('button')).not.toBeInTheDocument()
+    // An archived row offers only Unarchive (no Archive).
+    expect(within(rowFor('Old Portal')).getAllByRole('button').map((b) => b.textContent)).toEqual(['Unarchive'])
+  })
+})
+
+describe('Projects list: server-side search', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('sends ?q= 300 ms after the last key, and filters nothing in the browser', async () => {
+    const server = searchable()
+    renderApp('/projects')
+    await projectsTable()
+    expect(sentQueries(server)).toEqual([null])
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    fireEvent.change(searchBox(), { target: { value: 'Inv' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    fireEvent.change(searchBox(), { target: { value: '  Invoices ' } }) // another key: the wait starts again
+    await act(() => vi.advanceTimersByTimeAsync(299))
+    expect(sentQueries(server)).toEqual([null]) // nothing yet: 299 ms after the last key
+    await act(() => vi.advanceTimersByTimeAsync(1))
+    await vi.waitFor(() => expect(sentQueries(server)).toEqual([null, 'Invoices'])) // once, trimmed
+    vi.useRealTimers()
+
+    await waitFor(() => expect(screen.queryByText('Data Lake')).not.toBeInTheDocument())
+    expect(rowFor('Billing v2')).toBeInTheDocument()
+  })
+
+  it('a blank search sends no q', async () => {
+    const server = searchable()
+    const { user } = renderApp('/projects')
+    await projectsTable()
+    await user.type(searchBox(), 'lake')
+    await waitFor(() => expect(sentQueries(server).at(-1)).toBe('lake'))
+    await user.clear(searchBox())
+    await user.type(searchBox(), '   ')
+    await waitFor(() => expect(sentQueries(server).at(-1)).toBeNull())
+    expect(lastList(server).query).toBe('')
+    expect(await screen.findByRole('rowheader', { name: /Billing v2/ })).toBeInTheDocument()
+  })
+
+  it('a slow reply to an older search never replaces a newer one', async () => {
+    let releaseOld
+    const server = searchable({
+      hold: (q, answer) => (q === 'bil' ? new Promise((resolve) => { releaseOld = () => resolve(answer) }) : answer),
+    })
+    const { user } = renderApp('/projects')
+    await projectsTable()
+    await user.type(searchBox(), 'bil')
+    await waitFor(() => expect(sentQueries(server)).toContain('bil'))
+    // While it reloads, the box stays mounted and focused; only the list shows the skeleton.
+    expect(screen.getByRole('status', { name: 'Loading projects' })).toBeInTheDocument()
+    expect(searchBox()).toHaveFocus()
+
+    await user.clear(searchBox())
+    await user.type(searchBox(), 'lake')
+    expect(await screen.findByRole('rowheader', { name: /Data Lake/ })).toBeInTheDocument()
+    await act(async () => releaseOld()) // the old answer (Billing v2) arrives last
+    expect(screen.queryByText('Billing v2')).not.toBeInTheDocument()
+    expect(rowFor('Data Lake')).toBeInTheDocument()
+  })
+
+  it('no match says so; the clear button empties the box, keeps focus and shows everything again', async () => {
+    const server = searchable()
+    const { user } = renderApp('/projects')
+    await projectsTable()
+    const box = searchBox()
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument()
+    await user.type(box, 'zzz')
+    expect(await screen.findByText("No projects match 'zzz'.")).toBeInTheDocument()
+    expect(searchBox()).toBe(box) // the same box, never swapped for a skeleton
+    expect(box).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(box).toHaveValue('')
+    expect(box).toHaveFocus()
+    expect(await screen.findByRole('rowheader', { name: /Billing v2/ })).toBeInTheDocument()
+    expect(lastList(server).query).toBe('')
+  })
+
+  it('sends at most 100 characters (the server limit)', async () => {
+    const server = searchable()
+    renderApp('/projects')
+    await projectsTable()
+    expect(searchBox()).toHaveAttribute('maxlength', '100')
+    fireEvent.change(searchBox(), { target: { value: `${'x'.repeat(150)}` } }) // e.g. a paste past maxlength
+    await waitFor(() => expect(sentQueries(server).at(-1)).toHaveLength(100))
   })
 })
 
@@ -103,7 +207,7 @@ describe('Projects list: actions', () => {
     expect(dialog).toHaveAccessibleDescription(/deliverables and assignments are archived too/i)
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
 
-    expect(await screen.findByText('Billing v2 was archived.')).toBeInTheDocument()
+    expect(await screen.findByText('Project archived: Billing v2')).toBeInTheDocument()
     expect(server.count('POST', '/api/projects/p-1/archive')).toBe(1)
     expect(await screen.findByText('No projects to show yet.')).toBeInTheDocument()
   })
@@ -188,5 +292,23 @@ describe('Projects list: actions', () => {
     const list = await screen.findByRole('list', { name: 'Projects' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
     expect(within(list).getByRole('link', { name: 'Billing v2' })).toBeInTheDocument()
+  })
+})
+
+describe('Projects: table or cards', () => {
+  it('starts as a table, switches to cards and remembers the choice', async () => {
+    signedInAs('admin')
+    const { user, unmount } = renderApp('/projects')
+    expect(await screen.findByRole('table', { name: 'Projects' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cards' }))
+    const cards = await screen.findByRole('list', { name: 'Projects' })
+    expect(within(cards).getByRole('link', { name: 'Billing v2' })).toBeInTheDocument()
+    expect(within(cards).getByRole('button', { name: 'Archive Billing v2' })).toBeInTheDocument()
+    expect(window.localStorage.getItem(VIEW_KEY)).toBe('cards')
+
+    unmount()
+    renderApp('/projects')
+    expect(await screen.findByRole('list', { name: 'Projects' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Projects' })).not.toBeInTheDocument()
   })
 })

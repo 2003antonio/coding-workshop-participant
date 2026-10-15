@@ -88,6 +88,16 @@ def archive_employee(employee_id: str) -> Optional[dict]:
     )
 
 
+def unarchive_employee(employee_id: str) -> Optional[dict]:
+    """Clear archived_at (the record only). Returns the row, or None if it was not archived."""
+    return db.query_one(
+        "UPDATE employees SET archived_at = NULL "
+        "WHERE id = %s AND archived_at IS NOT NULL "
+        "RETURNING id, email, name, role, job_title, salary, team_id, archived_at",
+        (employee_id,),
+    )
+
+
 def leads_active_team(employee_id: str) -> bool:
     """True if the employee is the lead of at least one active team."""
     row = db.query_one(

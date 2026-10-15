@@ -6,6 +6,7 @@ details. Never pass passwords, tokens, email addresses or salaries.
 """
 
 import contextvars
+import datetime
 import json
 from typing import Optional
 
@@ -31,6 +32,7 @@ def record(
     entity_type: Optional[str] = None,
     entity_id: object = None,
     details: Optional[dict] = None,
+    at: Optional[datetime.datetime] = None,
 ) -> None:
     """Insert one audit row.
 
@@ -40,6 +42,7 @@ def record(
         entity_type: Kind of record acted on, e.g. "employee".
         entity_id: UUID of the record acted on, or None.
         details: Small dict of non-sensitive labels and ids, or None.
+        at: When it happened, for back-dated history (the demo seed only); default now.
 
     Raises:
         ValueError: If details contains a sensitive key.
@@ -47,13 +50,14 @@ def record(
     if details and _FORBIDDEN_DETAIL_KEYS.intersection(details):
         raise ValueError("Audit details must not contain sensitive fields.")
     db.execute(
-        "INSERT INTO audit_log (actor_id, action, entity_type, entity_id, details) "
-        "VALUES (%s, %s, %s, %s, CAST(%s AS jsonb))",
+        "INSERT INTO audit_log (actor_id, action, entity_type, entity_id, details, created_at) "
+        "VALUES (%s, %s, %s, %s, CAST(%s AS jsonb), COALESCE(CAST(%s AS timestamptz), now()))",
         (
             str(actor_id) if actor_id is not None else None,
             action,
             entity_type,
             str(entity_id) if entity_id is not None else None,
             json.dumps(details) if details is not None else None,
+            at.isoformat() if at is not None else None,
         ),
     )

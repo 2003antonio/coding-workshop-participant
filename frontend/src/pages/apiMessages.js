@@ -25,10 +25,14 @@ const BY_CODE = {
   overlapping_allocation: 'This person is already assigned to this project for those dates.',
   archived: "Archived records can't be changed.",
   already_archived: 'That is already archived.',
+  team_archived: 'Its team is archived, so this project cannot be restored.',
   email_taken: 'An employee with that email already exists.',
   last_admin: 'There must always be at least one active admin.',
   cannot_archive_self: "You can't archive your own account.",
 }
+
+/** Shown in every "Archive ...?" confirmation. */
+export const ARCHIVE_NOTE = 'Archived items stay in the history but disappear from lists.'
 
 export const API_MESSAGES = {
   badInput: 'Some details were not accepted. Check the form and try again.',

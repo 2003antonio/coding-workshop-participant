@@ -1,17 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { reply, signedInAs } from '../test/fakeApiServer'
-import { choose, headersOf, renderApp, rowFor } from '../test/renderApp'
+import { reply, seedData, signedInAs } from '../test/fakeApiServer'
+import { choose, renderApp, rowFor } from '../test/renderApp'
 
 describe('Teams list', () => {
   it('admin sees every team with lead and member count, and can create one', async () => {
     const server = signedInAs('admin')
     const { user } = renderApp('/teams')
 
-    await screen.findByRole('table', { name: 'Teams' })
-    expect(headersOf('Teams')).toEqual(['Team', 'Lead', 'Members'])
-    expect(within(rowFor('Platform')).getByText('Max Manager')).toBeInTheDocument()
-    expect(within(rowFor('Data')).getByText('1')).toBeInTheDocument()
+    // One card per team: lead, members as avatars and their count.
+    const cards = await screen.findByRole('list', { name: 'Teams' })
+    const card = (name) => within(cards).getByRole('link', { name }).closest('li')
+    expect(within(card('Platform')).getByText('Max Manager')).toBeInTheDocument()
+    expect(await within(card('Data')).findByText('1 member')).toBeInTheDocument()
+    expect(await within(card('Platform')).findByRole('img', { name: /^\d+ (person|people): / })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'New team' }))
     const dialog = await screen.findByRole('dialog', { name: 'New team' })
@@ -27,7 +29,7 @@ describe('Teams list', () => {
     await user.keyboard('{Escape}')
     await user.click(within(dialog).getByRole('button', { name: 'Create team' }))
 
-    expect(await screen.findByText('Mobile was created.')).toBeInTheDocument()
+    expect(await screen.findByText('Team created: Mobile')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'POST' && c.path === '/api/teams/').body)
       .toEqual({ name: 'Mobile', lead_id: 'u-6' })
     expect(await screen.findByRole('link', { name: 'Mobile' })).toBeInTheDocument()
@@ -49,7 +51,7 @@ describe('Teams list', () => {
   it('manager sees only the teams they lead, with no admin buttons', async () => {
     const server = signedInAs('manager')
     renderApp('/teams')
-    await screen.findByRole('table', { name: 'Teams' })
+    await screen.findByRole('list', { name: 'Teams' })
     expect(screen.getByRole('link', { name: 'Platform' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Data' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New team' })).not.toBeInTheDocument()
@@ -90,7 +92,7 @@ describe('Team detail', () => {
     expect(rowFor('Dee Data')).toBeInTheDocument()
     // Admin always gets the numbers, even for a team of one.
     const budget = await screen.findByRole('region', { name: 'Team budget' })
-    expect(within(budget).getByText('70,000.00')).toBeInTheDocument()
+    expect(within(budget).getByText('$70,000.00')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add member' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add a member to Data' })
@@ -102,14 +104,14 @@ describe('Team detail', () => {
     await user.click(screen.getByRole('option', { name: /Nia New/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Add member' }))
 
-    expect(await screen.findByText('Nia New was added to the team.')).toBeInTheDocument()
+    expect(await screen.findByText('Member added: Nia New')).toBeInTheDocument()
     expect(server.calls.find((c) => c.path === '/api/teams/t-2/members').body).toEqual({ employee_id: 'u-8' })
     await waitFor(() => expect(rowFor('Nia New')).toBeInTheDocument())
 
     await user.click(screen.getByRole('button', { name: 'Remove Dee Data' }))
     const confirm = await screen.findByRole('dialog', { name: 'Remove Dee Data from Data?' })
     await user.click(within(confirm).getByRole('button', { name: 'Remove' }))
-    expect(await screen.findByText('Dee Data was removed from the team.')).toBeInTheDocument()
+    expect(await screen.findByText('Member removed: Dee Data')).toBeInTheDocument()
     expect(server.count('DELETE', '/api/teams/t-2/members/u-7')).toBe(1)
   })
 
@@ -122,7 +124,7 @@ describe('Team detail', () => {
     await choose(user, /lead/i, /Ada Admin/, dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Platform was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Team updated: Platform')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ lead_id: 'u-1' })
     expect(await screen.findByText('Lead: Ada Admin')).toBeInTheDocument()
   })
@@ -157,7 +159,7 @@ describe('Team detail', () => {
     renderApp('/teams/t-1')
     const budget = await screen.findByRole('region', { name: 'Team budget' })
     // Platform has 3 members: Eve 90,000.50 + Bo 83,200 + Cy 72,800.
-    expect(within(budget).getByText('246,000.50')).toBeInTheDocument()
+    expect(within(budget).getByText('$246,000.50')).toBeInTheDocument()
     expect(within(budget).getByText(/Salaries of 3 members/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /edit team|add member|remove/i })).not.toBeInTheDocument()
   })
@@ -192,5 +194,28 @@ describe('Team detail', () => {
     const list = await screen.findByRole('list', { name: 'Members' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(3)
     expect(within(list).getByRole('button', { name: 'Remove Eve Employee' })).toBeInTheDocument()
+  })
+})
+
+describe('Edit team lead: a member who could lead', () => {
+  it('is listed greyed out, and becomes lead only after confirming; then leaves the members first', async () => {
+    const db = seedData()
+    db.employees.push({ id: 'u-9', name: 'Lee Lead', role: 'manager', job_title: 'Tech Lead', salary: 110000,
+      team_id: 't-1', email: 'lee@acme.test', archived_at: null })
+    const server = signedInAs('admin', { db })
+    const { user } = renderApp('/teams/t-1')
+    await user.click(await screen.findByRole('button', { name: 'Edit team' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Platform' })
+    await choose(user, /lead/i, 'Lee Lead (member, remove them from the team first)', dialog)
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(within(dialog).getByText('Tick the box to take Lee Lead off the members first.')).toBeInTheDocument()
+    expect(server.count('PUT', '/api/teams/t-1')).toBe(0)
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Make lead and remove from members' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Lead changed: Lee Lead (removed from members)')).toBeInTheDocument()
+    const writes = server.calls.filter((c) => c.method === 'DELETE' || c.method === 'PUT').map((c) => `${c.method} ${c.path}`)
+    expect(writes).toEqual(['DELETE /api/teams/t-1/members/u-9', 'PUT /api/teams/t-1'])
+    expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ lead_id: 'u-9' })
   })
 })

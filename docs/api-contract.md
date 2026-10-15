@@ -34,6 +34,19 @@ possible later changes that are **not** built.
     manager without the flag; for anyone else it is `404`.
 
   Archiving twice → `409 already_archived`. Archived rows cannot be changed → `409 archived`.
+- **Unarchive (people and projects only).** `POST /api/employees/{id}/unarchive` (admin) and
+  `POST /api/projects/{id}/unarchive` (admin; the manager of the project's team) clear
+  `archived_at` and return the restored record in its usual shape (the same fields the caller
+  would see from `GET`; salary only for an admin). Unarchiving something that is not archived
+  (or does not exist, or the caller cannot see) → `404 not_found`. A manager on the employee
+  route, or an employee on either → `403`. Audited as `employee_unarchived` / `project_unarchived`
+  (no details).
+  - An employee comes back as a record only: the team membership and allocations they had are
+    left exactly as they are (archived allocations stay archived).
+  - A project whose team is archived → `409 team_archived` (teams have no unarchive, so such a
+    project stays archived). The deliverables archived together with the project
+    (same `archived_at`) come back with it; deliverables archived earlier and all allocations stay
+    archived (people may have moved on, and the 40-hour rule is not re-checked).
 - **Text fields:** trimmed, non-empty, max 200 chars (`name`), description max 2000, may be empty.
 - **Weeks.** A "calendar week" is an ISO week, Monday to Sunday, identified by its Monday
   (`week_start`). An allocation counts its full `hours_per_week` in every week its date range
@@ -123,6 +136,7 @@ have a non-archived allocation (past, current or future).
 | `POST /` | admin; manager for a team they lead | `{"team_id", "name", "description?", "status?", "start_date", "end_date", "planned_budget?"}` | `201 project` |
 | `PUT /{id}` | admin; the project's manager | any of `name, description, status, start_date, end_date, planned_budget`; `team_id` admin only | `200 project` |
 | `POST /{id}/archive` | admin; the project's manager | — | `200 project` |
+| `POST /{id}/unarchive` | admin; the project's manager | — | `200 project` (see §1, Unarchive) |
 | `GET /{id}/budget` | admin; the project's manager | — | `200 budget` (see §7) |
 
 List order: `start_date`, then name. Filters:
@@ -240,7 +254,7 @@ members, or distinct people allocated to a project) is smaller, a non-admin gets
 salary-derived field as `null` and `"hidden_reason": "below_min_group"`, never a number. When
 shown, `hidden_reason` is `null`. Admin always gets the numbers (they can see salaries anyway).
 `planned_budget` is typed in, not salary-derived, so it is never hidden from those who may see it.
-Known limit: comparing totals before and after one person joins or leaves can still reveal a salary.
+Known limit: comparing totals before and after one person joins or leaves can still reveal a salary. Also, a manager can change the hours on their own team's assignments, and once 3 or more people are on a project its committed cost is shown to them, so watching that total change as they change one person's hours (or as weeks pass) reveals that colleague's hourly rate. This is an inherent limit of showing managers aggregates at all; every such edit is in the audit log, and the stricter option would be to make the cost fields admin-only.
 
 **Team budget** — `GET /api/teams/{id}/budget` (admin, that team's lead):
 ```json
@@ -358,13 +372,48 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
    `teams`: admin all active teams, a manager the teams they lead; hidden below
    `MIN_AGGREGATE_GROUP` members exactly as in §7. No per-person lines here, even for admin.
 
+8. **Activity** — `/activity?limit=&offset=&type=` — admin, manager (employees `403`).
+   Who did what and when, read from `audit_log` (newest first). Read-only.
+   ```json
+   { "activity": [{ "id": "uuid", "occurred_at": "2026-10-14T21:05:00+00:00",
+                    "actor": { "id": "uuid", "name": "Alex Admin", "role": "admin" },
+                    "action": "deliverable_archived", "type": "deliverables",
+                    "entity_type": "deliverable", "entity_id": "uuid",
+                    "sentence": "Alex Admin archived deliverable 'API design'" }],
+     "total": 42, "limit": 50, "offset": 0 }
+   ```
+   - `limit`: 1–100, default 50. `offset`: 0 or more, default 0. Anything else → `400 bad_request`.
+   - `type`: one of `people`, `teams`, `projects`, `deliverables`, `assignments`, `sign-ins`
+     (anything else → `400 bad_request`). Without it, every type the caller may see.
+   - `actor` is `null` when nobody was signed in (a sign-in with an unknown email).
+     A row whose actor has no employee record is not listed (people are archived, never
+     deleted, so this only happens after `seed_demo.py --reset`, which keeps the audit log).
+   - `total` counts every row the same caller and filter would get, ignoring `limit`/`offset`.
+   - **Scope.** Admin: every row. Manager: only rows about projects of teams they lead, and the
+     deliverables and assignments of those projects; never people, team, salary or sign-in
+     rows (so `type=people`, `teams` or `sign-ins` returns an empty list).
+   - **Privacy.** The stored `details` object is never returned. `sentence` is built on the
+     server from a whitelist per action: names (resolved by joins, so renamed or archived
+     records show their current name; a missing record reads "a deliverable", "a person", ...),
+     plus, for updates, the *names* of the changed fields ("hours per week", "dates"), never
+     their values. No salary, hourly rate or cost figure is ever in a row, for any role; a salary
+     change reads "Alex Admin changed a salary for Ana Silva". Token refreshes are not listed.
+   - Actions listed: `employee_created|role_changed|salary_changed|updated|archived` (people),
+     `team_created|lead_changed|updated|member_added|member_removed|archived` (teams),
+     `employee_unarchived` (people: "Alex Admin unarchived Ana Silva"),
+     `project_created|updated|archived|unarchived` (projects),
+     `deliverable_created|updated|dependencies_changed|archived` (deliverables),
+     `allocation_created|updated|archived` (assignments),
+     `login_success|failure|locked`, `logout`, `refresh_reuse_detected` (sign-ins).
+     Any other action in the table is not listed.
+
 ## 9. Error codes added in this block
 
 | Code | Status | Where |
 |---|---|---|
 | `invalid_lead`, `invalid_team`, `invalid_employee`, `invalid_dependency`, `invalid_dates`, `invalid_range` | 400 | input that refers to the wrong thing |
 | `name_taken`, `on_other_team`, `already_member`, `has_active_projects`, `leads_team`, `lead_cannot_be_member` | 409 | teams / employees |
-| `dates_conflict`, `deliverables_open`, `project_closed` | 409 | projects |
+| `dates_conflict`, `deliverables_open`, `project_closed`, `team_archived` | 409 | projects (`team_archived`: unarchive) |
 | `dependency_cycle`, `dependencies_not_done`, `dependents_started`, `has_dependents` | 409 | deliverables |
 | `over_allocated`, `overlapping_allocation` | 409 | allocations |
 | `archived`, `already_archived` | 409 | everywhere (existing codes) |
@@ -378,25 +427,35 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
 | Archive a team | `POST /api/teams/{id}/archive` | Team detail |
 | Team budget for lead and admin (hidden below 3 members) | `GET /api/teams/{id}/budget` | Team detail → budget card |
 | Projects belong to one team, manager = lead | `POST/PUT /api/projects` | Projects page → project form |
-| Role-based project visibility | `GET /api/projects`, `GET /api/projects/{id}` | Projects page |
+| Role-based project visibility | `GET /api/projects`, `GET /api/projects/{id}` | Projects page (`?status=` from a Home card picks the filter) |
 | Search projects by name or description | `GET /api/projects?q=` | Projects page → search box |
 | Planned budget per project (admin and manager) | `POST/PUT /api/projects` (`planned_budget`) | Project form → budget field |
 | Archive a project | `POST /api/projects/{id}/archive` | Project detail |
+| Unarchive a project (admin; the team's manager) | `POST /api/projects/{id}/unarchive` | Projects page → "Show archived" → Unarchive (toast "Project unarchived") |
+| Unarchive an employee (admin) | `POST /api/employees/{id}/unarchive` | Employees page → "Show archived" → Unarchive (toast "Employee unarchived") |
 | Deliverables with dates | `GET/POST/PUT /api/projects/{id}/deliverables` | Project detail → Deliverables tab |
 | Dependencies, no cycles | `PUT .../deliverables/{id}/dependencies` | Deliverable form → "depends on" picker |
 | Cannot start before dependencies are done | `PUT .../deliverables/{id}` (status) | Deliverables tab → status control |
-| Assign people to projects (manager: own team) | `POST/PUT /api/allocations`, `POST /api/allocations/{id}/archive` | Project detail → Allocations tab |
+| Assign people to projects (manager: own team) | `POST/PUT /api/allocations`, `POST /api/allocations/{id}/archive` | Project detail → People tab |
 | 40 hours per week per person | `POST/PUT /api/allocations` (409 `over_allocated`) | Allocation form → error with weeks |
-| Employee sees own allocations | `GET /api/allocations` | My work page (new screen) |
-| Salary / rate admin-only | all budget endpoints, allocation shape | Budget tab, Employees page |
-| Project budget (managers: totals, hidden below 3 people) | `GET /api/projects/{id}/budget` | Project detail → Budget tab |
+| Employee sees own allocations | `GET /api/allocations`, `GET /api/reports/resource-allocation` | My work page (hours chart + assignments); employee Home (summary and cards, with `GET /api/reports/deliverable-status`) |
+| Salary / rate admin-only | all budget endpoints, allocation shape, `GET /api/employees` | Employees page, employee form, Budget tab cost lines, People tab weekly cost: admin only, masked until the admin clicks the eye (display only; the API response is unchanged) |
+| Project budget (managers: totals, hidden below 3 people) | `GET /api/projects/{id}/budget` | Project detail → header budget bar and Budget tab |
 | Report: project status | `GET /api/reports/project-status` | Reports → Project status |
-| Report: at-risk projects | `GET /api/reports/at-risk-projects` | Reports → At risk (also on dashboard) |
-| Report: resource allocation | `GET /api/reports/resource-allocation` | Reports → Resources (week grid) |
+| Report: at-risk projects | `GET /api/reports/at-risk-projects` | Reports → At risk (also on the admin/manager Home) |
+| Report: resource allocation | `GET /api/reports/resource-allocation` | Reports → Resources (heat-map) |
 | Report: deliverable status | `GET /api/reports/deliverable-status` | Reports → Deliverables |
 | Report: over-allocated people (near capacity, default 32 h) | `GET /api/reports/over-allocated` | Reports → Near capacity |
-| Report: dependency chain | `GET /api/reports/dependency-chain` | Project detail → Dependencies view |
-| Report: budget vs planned budget | `GET /api/reports/budget` | Reports → Budget |
+| Report: dependency chain | `GET /api/reports/dependency-chain` | Project detail → Dependencies tab (timeline); Reports → Dependencies (table) |
+| Report: budget vs planned budget | `GET /api/reports/budget` | Reports → Budget (with the shared budget bar); admin/manager Home → Budget used |
+| Who did what, when (audit log), admin and manager only | `GET /api/reports/activity` | Activity page (`/activity`, sidebar link for admin and manager): feed with type chips and "Load more" |
+
+The Home cards link to `/projects?status=active` and `/reports?tab=at-risk|deliverables|budget|near-capacity`;
+unknown values open the defaults. No new endpoints were added for these screens; the Activity page
+is the one screen with its own endpoint (report 8). Closing a project ("Close project" / "Reopen
+project" on Project detail) is `PUT /api/projects/{id}` with `status: completed` / `active`; the
+employee Home and the admin/manager "Coming up" card use only `GET /api/allocations`,
+`GET /api/projects`, `GET /api/teams` and report 4.
 
 ## 11. Known gaps (allowed by design for now)
 
@@ -409,5 +468,15 @@ These are deliberate, tested behaviours that a later block may change:
 - Archiving an employee leaves their team membership and allocations as they are; those
   allocations still count in project costs until an admin archives them. An archived person
   is not counted in `member_count` or the team budget, and gets no new allocations.
+- Unarchiving an employee does not restore allocations, and unarchiving a project does not
+  restore its allocations; they must be made again (and pass the 40-hour rule). Teams and
+  deliverables have no unarchive of their own.
 - Report 3 with a `team_id` outside the caller's scope returns an empty list rather than `403`.
 - `include_archived` on teams is admin-only (§1).
+- The Activity feed (report 8) says *what* changed (action, record and field names), never the
+  before/after values, and lists only whitelisted actions; demo resets keep old audit rows but rows
+  whose actor no longer exists are not listed. Managers never see team, people or sign-in rows,
+  even about their own team.
+- The admin salary mask is a display guard only: `GET /api/employees`, allocation and budget
+  responses still carry salary, `hourly_rate` and per-person costs for an admin (and never for
+  anyone else).

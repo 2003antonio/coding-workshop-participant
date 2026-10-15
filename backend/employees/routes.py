@@ -134,12 +134,19 @@ def archive_employee(params: dict, query: dict, body: object, headers: dict) -> 
     return responses.ok(services.archive_employee(actor, _employee_id(params)))
 
 
+def unarchive_employee(params: dict, query: dict, body: object, headers: dict) -> dict:
+    actor = rbac.authenticate_request(headers)
+    rbac.require_min_role(actor, "admin")
+    return responses.ok(services.unarchive_employee(actor, _employee_id(params)))
+
+
 ROUTES = {
     ("GET", "/"): list_employees,
     ("POST", "/"): create_employee,
     ("GET", "/{id}"): get_employee,
     ("PUT", "/{id}"): update_employee,
     ("POST", "/{id}/archive"): archive_employee,
+    ("POST", "/{id}/unarchive"): unarchive_employee,
 }
 
 

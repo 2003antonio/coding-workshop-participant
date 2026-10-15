@@ -1,26 +1,32 @@
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
-import Typography from '@mui/material/Typography'
-import { useMediaQuery } from 'react-responsive'
+import { canSeeDashboard } from '../auth/roles'
 import { useAuth } from '../auth/useAuth'
 import AppShell from '../components/AppShell'
+import Dashboard from '../components/dashboard/Dashboard'
+import EmployeeHome from '../components/home/EmployeeHome'
+import { greeting } from '../components/home/homeMath'
+import PageHeader from '../components/PageHeader'
+import { ROLE_LABELS } from './format'
 
-const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
-
-/** The first protected page: who is signed in. Navigation and sign-out live in AppShell. */
+/**
+ * Home: "Welcome, <name>" for every role, then the company dashboard (admin),
+ * the team dashboard (manager) or a short summary of the person's own work with
+ * cards that lead to My work and their projects (employee; the chart is on My work).
+ */
 export default function HomePage() {
   const { user, role } = useAuth()
-  const isPhone = useMediaQuery({ maxWidth: 599 })
+  const employee = !canSeeDashboard(role)
 
   return (
     <AppShell>
-      <Typography variant={isPhone ? 'h5' : 'h4'} component="h1" gutterBottom>
-        Welcome, {user?.name}
-      </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography color="text.secondary">Signed in as</Typography>
-        <Chip label={ROLE_LABELS[role] ?? role} color="primary" size="small" />
-      </Box>
+      <PageHeader title={`Welcome, ${user?.name ?? ''}`}
+        subtitle={employee ? `${greeting()}. Here is your week.` : undefined} after={(
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, color: 'text.secondary' }}>
+          Signed in as <Chip label={ROLE_LABELS[role] ?? role} color="primary" size="small" />
+        </Box>
+      )} />
+      {employee ? <EmployeeHome userId={user?.id} /> : <Dashboard role={role} />}
     </AppShell>
   )
 }

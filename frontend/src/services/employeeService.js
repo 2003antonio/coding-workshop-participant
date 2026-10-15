@@ -71,6 +71,11 @@ export function updateEmployee(accessToken, id, changes) {
   return request(one(id), accessToken, { method: 'PUT', body: changes })
 }
 
+/** POST /{id}/unarchive (admin) -> the employee, active again (the record only) */
+export function unarchiveEmployee(accessToken, id) {
+  return request(`${one(id)}/unarchive`, accessToken, { method: 'POST' })
+}
+
 /** POST /{id}/archive (admin) -> the archived employee */
 export function archiveEmployee(accessToken, id) {
   return request(`${one(id)}/archive`, accessToken, { method: 'POST' })

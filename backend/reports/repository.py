@@ -123,3 +123,51 @@ def team_salaries(team_ids: list) -> list:
         "WHERE team_id = ANY(CAST(%s AS uuid[])) AND archived_at IS NULL",
         (team_ids,),
     )
+
+
+# Activity (report 8): audit_log rows with the names needed for a sentence,
+# resolved by joins (nothing extra is stored). Takes the parameters
+# (actions, role, actor_id). The scope is the WHERE clause: admin every row;
+# a manager only project, deliverable and allocation rows whose project
+# belongs to a team they lead. details is selected for the services layer,
+# which reads only whitelisted keys and never returns it.
+_ACTIVITY_FROM = (
+    "FROM audit_log a "
+    "LEFT JOIN employees ae ON ae.id = a.actor_id "
+    "LEFT JOIN employees emp ON a.entity_type = 'employee' AND emp.id = a.entity_id "
+    "LEFT JOIN teams tm ON a.entity_type = 'team' AND tm.id = a.entity_id "
+    "LEFT JOIN deliverables dl ON a.entity_type = 'deliverable' AND dl.id = a.entity_id "
+    "LEFT JOIN allocations al ON a.entity_type = 'allocation' AND al.id = a.entity_id "
+    "LEFT JOIN employees alemp ON alemp.id = al.employee_id "
+    "LEFT JOIN projects pr ON pr.id = CASE a.entity_type "
+    "  WHEN 'project' THEN a.entity_id WHEN 'deliverable' THEN dl.project_id "
+    "  WHEN 'allocation' THEN al.project_id END "
+    "LEFT JOIN teams pt ON pt.id = pr.team_id "
+    "LEFT JOIN employees mem ON a.action IN ('team_member_added', 'team_member_removed') "
+    "  AND CAST(mem.id AS text) = a.details ->> 'employee_id' "
+    "WHERE a.action = ANY(CAST(%s AS text[])) "
+    # People are archived, never deleted, so an actor id with no employee row only
+    # happens after a demo reset: such rows are left out rather than shown as "Someone".
+    "  AND (a.actor_id IS NULL OR ae.id IS NOT NULL) "
+    "  AND (%s = 'admin' OR (a.entity_type IN ('project', 'deliverable', 'allocation') "
+    "       AND pt.lead_id = %s)) "
+)
+
+
+def activity(actions: list, role: str, actor_id: str, limit: int, offset: int) -> list:
+    """One page of audit rows the caller may see, newest first."""
+    return db.query(
+        "SELECT a.id, a.created_at, a.action, a.entity_type, a.entity_id, a.details, "
+        "  a.actor_id, ae.name AS actor_name, ae.role AS actor_role, "
+        "  emp.name AS employee_name, tm.name AS team_name, dl.name AS deliverable_name, "
+        "  pr.name AS project_name, alemp.name AS assignee_name, mem.name AS member_name "
+        + _ACTIVITY_FROM
+        + "ORDER BY a.created_at DESC, a.id DESC LIMIT %s OFFSET %s",
+        (list(actions), role, actor_id, limit, offset),
+    )
+
+
+def activity_count(actions: list, role: str, actor_id: str) -> int:
+    """How many audit rows the caller may see for these actions."""
+    rows = db.query("SELECT COUNT(*) AS n " + _ACTIVITY_FROM, (list(actions), role, actor_id))
+    return int(rows[0]["n"])

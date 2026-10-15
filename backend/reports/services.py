@@ -1,4 +1,4 @@
-"""The seven reports (docs/api-contract.md section 8). Read-only.
+"""The eight reports (docs/api-contract.md section 8). Read-only.
 
 Every report covers only what the caller can see (contract section 4), and
 money follows section 7: no per-person figures, and totals hidden from
@@ -364,3 +364,116 @@ def budget_report(actor: dict, team_id: Optional[str]) -> dict:
             "hidden_reason": budget.hidden_reason(hidden),
         })
     return {"projects": project_rows, "teams": team_rows}
+
+
+# =====================================================================
+# 8. Activity (the audit log, read-only)
+# =====================================================================
+# The whitelist: every action listed, its type (the filter chips) and the
+# sentence. Templates use only names resolved by joins and, for updates, the
+# words for the changed fields from _FIELD_WORDS. The stored details object is
+# never returned, and no template can carry a salary, rate or cost figure.
+ACTIVITY_TYPES = ("people", "teams", "projects", "deliverables", "assignments", "sign-ins")
+
+_ACTIONS = {
+    "employee_created": ("people", "{actor} added {employee}"),
+    "employee_role_changed": ("people", "{actor} changed the role of {employee}"),
+    "employee_salary_changed": ("people", "{actor} changed a salary for {employee}"),
+    "employee_updated": ("people", "{actor} updated {employee}{fields}"),
+    "employee_archived": ("people", "{actor} archived {employee}"),
+    "employee_unarchived": ("people", "{actor} unarchived {employee}"),
+    "team_created": ("teams", "{actor} created {team}"),
+    "team_lead_changed": ("teams", "{actor} changed the lead of {team}"),
+    "team_updated": ("teams", "{actor} renamed {team}"),
+    "team_member_added": ("teams", "{actor} added {member} to {team}"),
+    "team_member_removed": ("teams", "{actor} removed {member} from {team}"),
+    "team_archived": ("teams", "{actor} archived {team}"),
+    "project_created": ("projects", "{actor} created {project}"),
+    "project_updated": ("projects", "{actor} updated {project}{fields}"),
+    "project_archived": ("projects", "{actor} archived {project}"),
+    "project_unarchived": ("projects", "{actor} unarchived {project}"),
+    "deliverable_created": ("deliverables", "{actor} added {deliverable} to {project}"),
+    "deliverable_updated": ("deliverables", "{actor} updated {deliverable}{fields}"),
+    "deliverable_dependencies_changed": ("deliverables",
+                                         "{actor} changed what {deliverable} depends on"),
+    "deliverable_archived": ("deliverables", "{actor} archived {deliverable}"),
+    "allocation_created": ("assignments", "{actor} assigned {assignee} to {project}"),
+    "allocation_updated": ("assignments", "{actor} changed the assignment of {assignee} on {project}{fields}"),
+    "allocation_archived": ("assignments", "{actor} removed {assignee} from {project}"),
+    "login_success": ("sign-ins", "{actor} signed in"),
+    "login_failure": ("sign-ins", "A sign-in as {actor} failed{reason}"),
+    "login_locked": ("sign-ins", "{actor}'s account was locked after too many failed sign-ins"),
+    "logout": ("sign-ins", "{actor} signed out"),
+    "refresh_reuse_detected": ("sign-ins", "A reused session for {actor} was refused"),
+}
+
+# Field names that may be named in an "updated" sentence, and how to say them.
+# A field not in this list is never named (so a new field can't leak by accident).
+_FIELD_WORDS = {
+    "name": "name", "description": "description", "status": "status", "job_title": "job title",
+    "start_date": "start date", "end_date": "end date", "due_date": "due date",
+    "planned_budget": "planned budget", "team_id": "team", "hours_per_week": "hours per week",
+}
+
+_REASONS = {"wrong_password": " (wrong password)", "archived": " (archived account)"}
+
+_MISSING = {"employee": "a person", "team": "a team", "project": "a project", "deliverable": "a deliverable",
+            "assignee": "someone", "member": "someone"}
+
+
+def activity_actions(activity_type: Optional[str]) -> list:
+    """The whitelisted actions of one type, or of every type."""
+    return sorted(a for a, (kind, _) in _ACTIONS.items() if activity_type in (None, kind))
+
+
+def _named(kind: str, name: Optional[str]) -> str:
+    """"deliverable 'API design'", or "a deliverable" when the record is gone."""
+    return f"{kind} '{name}'" if name else _MISSING[kind]
+
+
+def _fields_words(details: Optional[dict]) -> str:
+    fields = (details or {}).get("fields") or []
+    words = [_FIELD_WORDS[f] for f in fields if isinstance(f, str) and f in _FIELD_WORDS]
+    return f" ({', '.join(words)})" if words else ""
+
+
+def activity_sentence(row: dict) -> str:
+    """The plain-language sentence for one audit row, from whitelisted parts only."""
+    _, template = _ACTIONS[row["action"]]
+    details = row.get("details") if isinstance(row.get("details"), dict) else {}
+    actor = row.get("actor_name")
+    if row["action"] == "login_failure" and not actor:
+        return "A sign-in with an unknown email failed"
+    return template.format(
+        actor=actor or "Someone",
+        employee=row.get("employee_name") or _MISSING["employee"],
+        team=_named("team", row.get("team_name")),
+        project=_named("project", row.get("project_name")),
+        deliverable=_named("deliverable", row.get("deliverable_name")),
+        assignee=row.get("assignee_name") or _MISSING["assignee"],
+        member=row.get("member_name") or _MISSING["member"],
+        fields=_fields_words(details),
+        reason=_REASONS.get(details.get("reason"), ""),
+    )
+
+
+def activity(actor: dict, activity_type: Optional[str], limit: int, offset: int) -> dict:
+    """Report 8: who did what and when, newest first, within the caller's scope."""
+    actions = activity_actions(activity_type)
+    role, actor_id = actor["role"], str(actor["id"])
+    rows = repository.activity(actions, role, actor_id, limit, offset)
+    total = repository.activity_count(actions, role, actor_id)
+    return {
+        "activity": [{
+            "id": str(r["id"]),
+            "occurred_at": _iso(r["created_at"]),
+            "actor": ({"id": str(r["actor_id"]), "name": r["actor_name"], "role": r["actor_role"]}
+                      if r["actor_id"] is not None and r["actor_name"] else None),
+            "action": r["action"],
+            "type": _ACTIONS[r["action"]][0],
+            "entity_type": r["entity_type"],
+            "entity_id": str(r["entity_id"]) if r["entity_id"] is not None else None,
+            "sentence": activity_sentence(r),
+        } for r in rows],
+        "total": total, "limit": limit, "offset": offset,
+    }

@@ -2,16 +2,16 @@
 // (docs/api-contract.md §5, §6). Built from details only, never from server text.
 // The 40-hour details carry weeks and hours only, so other projects are never named.
 
-const shortDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+const shortDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 
-/** "2026-10-26" -> "Oct 26". Calendar days, read as UTC so the day never shifts. */
+/** "2026-10-26" -> "Oct 26, 2026". Calendar days, read as UTC so the day never shifts. */
 const formatWeek = (date) => shortDay.format(new Date(`${date}T00:00:00Z`))
 
 /** Names for ids, in order; an id not among `deliverables` reads "another deliverable". */
 export const namesOf = (ids, deliverables = []) =>
   (ids ?? []).map((id) => deliverables.find((d) => d.id === id)?.name ?? 'another deliverable')
 
-/** [{ week_start, hours }] -> "Over 40 hours in: week of Oct 26 (45 h), week of Nov 2 (45 h)". */
+/** [{ week_start, hours }] -> "Over 40 hours in: week of Oct 26, 2026 (45 h), week of Nov 2, 2026 (45 h)". */
 export function weeksOverSentence(weeks) {
   if (!weeks?.length) return null
   return `Over 40 hours in: ${weeks.map((w) => `week of ${formatWeek(w.week_start)} (${w.hours} h)`).join(', ')}`

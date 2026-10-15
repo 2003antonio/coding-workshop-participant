@@ -1,9 +1,9 @@
 // Display helpers shared by the pages.
 
-const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const day = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
-/** 52000 -> "52,000.00" (the API sends money as plain numbers, no currency). */
+/** 52000 -> "$52,000.00" (the API sends money as plain numbers, in US dollars). */
 export const formatMoney = (amount) => money.format(amount)
 
 /** 25.8 -> "25.8%", 40 -> "40.0%"; null -> "—". The API sends one decimal. */
@@ -13,6 +13,19 @@ export const formatPercent = (value) => (value === null || value === undefined ?
 export function formatDate(date) {
   if (!date) return '—'
   return day.format(new Date(`${date}T00:00:00Z`))
+}
+
+const monthDay = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+/** Monday "2026-12-28" -> "week of Dec 28, 2026". Every week label carries its year. */
+export function formatWeek(date) {
+  return date ? `week of ${formatDate(date)}` : '—'
+}
+
+/** Monday "2026-12-28" -> "Dec 28 ’26": the compact form for column headers and lists, still with the year. */
+export function formatWeekShort(date) {
+  if (!date) return '—'
+  return `${monthDay.format(new Date(`${date}T00:00:00Z`))} ’${date.slice(2, 4)}`
 }
 
 export const PROJECT_STATUS = {

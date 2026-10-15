@@ -155,6 +155,14 @@ def archive_project(project_id: str) -> None:
     db.execute("UPDATE projects SET archived_at = now() WHERE id = %s", (project_id,))
 
 
+def unarchive_project(project_id: str, archived_at) -> None:
+    """Restore a project and the deliverables archived together with it (same archived_at).
+    Allocations stay archived."""
+    db.execute("UPDATE deliverables SET archived_at = NULL "
+               "WHERE project_id = %s AND archived_at = %s", (project_id, archived_at))
+    db.execute("UPDATE projects SET archived_at = NULL WHERE id = %s", (project_id,))
+
+
 def budget_allocations(project_id: str) -> list:
     """Active allocations of a project with each person's name and salary (budget only)."""
     return db.query(

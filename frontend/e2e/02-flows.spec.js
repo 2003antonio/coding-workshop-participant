@@ -5,7 +5,7 @@
 import { expect, test } from '@playwright/test'
 import { dayFromMonday, openFromMenu, settle, signIn, snap } from './demo.js'
 
-const weekLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+const weekLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 const shortDay = (date) => weekLabel.format(new Date(`${date}T00:00:00Z`))
 
 /** Open a project from the Projects page. */
@@ -67,7 +67,7 @@ test('marta assigns a Platform member to Mobile app, and is offered only Platfor
   await dialog.getByRole('textbox', { name: 'Hours per week' }).fill('10')
   await dialog.getByRole('button', { name: 'Assign' }).click()
 
-  await expect(page.getByRole('status').filter({ hasText: 'Cy Okafor was assigned.' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Person assigned: Cy Okafor' })).toBeVisible()
   await expect(page.getByRole('table', { name: 'Assignments' }).getByRole('rowheader', { name: 'Cy Okafor' }))
     .toBeVisible()
   await snap(page, 'marta', 'flow-person-assigned')

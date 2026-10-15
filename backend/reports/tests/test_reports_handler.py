@@ -7,7 +7,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 REPORTS = ["project-status", "at-risk-projects", "resource-allocation", "deliverable-status",
-           "over-allocated", "dependency-chain", "budget"]
+           "over-allocated", "dependency-chain", "budget", "activity"]
 
 
 @pytest.mark.parametrize("report", REPORTS)

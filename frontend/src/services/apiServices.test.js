@@ -91,6 +91,7 @@ const ENDPOINTS = [
   ['createProject', (t) => projects.createProject(t, { name: 'X' }), 'POST', '/projects/', { name: 'X' }],
   ['updateProject', (t) => projects.updateProject(t, 'p', { status: 'active' }), 'PUT', '/projects/p', { status: 'active' }],
   ['archiveProject', (t) => projects.archiveProject(t, 'p'), 'POST', '/projects/p/archive'],
+  ['unarchiveProject', (t) => projects.unarchiveProject(t, 'p'), 'POST', '/projects/p/unarchive'],
   ['listDeliverables', (t) => projects.listDeliverables(t, 'p'), 'GET', '/projects/p/deliverables/'],
   ['createDeliverable', (t) => projects.createDeliverable(t, 'p', { name: 'D' }), 'POST', '/projects/p/deliverables/', { name: 'D' }],
   ['updateDeliverable', (t) => projects.updateDeliverable(t, 'p', 'd', { status: 'done' }), 'PUT',

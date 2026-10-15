@@ -32,7 +32,7 @@ describe('Reports: content', () => {
     expect(headersOf('Project status')).toEqual(['Project', 'Team', 'Status', 'Complete', 'Done', 'Overdue', 'Blocked'])
     const billing = rowFor('Billing v2')
     expect(within(billing).getByText('33%')).toBeInTheDocument()
-    expect(within(billing).getByRole('progressbar', { name: 'Billing v2 complete' })).toHaveAttribute('aria-valuenow', '33.33')
+    expect(within(billing).getByRole('img', { name: 'Billing v2: 1 done, 1 in progress, 1 not started' })).toBeInTheDocument()
     expect(within(billing).getByText('1 of 3')).toBeInTheDocument()
     expect(within(rowFor('Data Lake')).getByText('0%')).toBeInTheDocument()
   })
@@ -65,15 +65,19 @@ describe('Reports: content', () => {
 
   it('resources shows a week grid; hours on hidden projects are not named', async () => {
     signedInAs('manager')
-    renderApp('/reports?report=resources')
+    const { user } = renderApp('/reports?report=resources')
     await screen.findByRole('table', { name: 'Resource allocation' })
     const headers = headersOf('Resource allocation')
-    expect(headers.slice(0, 3)).toEqual(['Person', 'Nov 9', 'Nov 16'])
+    expect(headers.slice(0, 3)).toEqual(['Person', 'Nov 9 ’26', 'Nov 16 ’26'])
     expect(headers).toHaveLength(13) // person + 12 weeks
     expect(screen.getAllByRole('rowheader').map((r) => r.textContent)).toEqual(['Eve Employee', 'Bo Builder', 'Cy Coder'])
     const eveWeek2 = within(rowFor('Eve Employee')).getAllByRole('cell')[1]
     expect(eveWeek2).toHaveTextContent('36 h')
-    expect(eveWeek2.querySelector('span')).toHaveAttribute('title', 'Billing v2: 20 h, Elsewhere: 16 h')
+    // The breakdown moved from a title attribute to a tooltip on hover and focus (heat-map, slice 8).
+    await user.hover(eveWeek2)
+    const tip = await screen.findByRole('tooltip')
+    expect(tip).toHaveTextContent('Billing v2: 20 h')
+    expect(tip).toHaveTextContent('Other projects: 16 h')
     expect(screen.queryByText(/Data Lake/)).not.toBeInTheDocument()
   })
 
@@ -95,8 +99,10 @@ describe('Reports: content', () => {
     await screen.findByRole('table', { name: 'Near capacity' })
     expect(reportCalls(server, 'over-allocated')[0].query).toBe('?threshold=32')
     expect(headersOf('Near capacity')).toEqual(['Person', 'Weeks above 32 h'])
-    expect(within(rowFor('Eve Employee')).getByText('Nov 16: 36 h')).toBeInTheDocument()
-    expect(within(rowFor('Dee Data')).getByText('Nov 9: 36 h, Nov 16: 36 h, Nov 23: 36 h')).toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByText('Nov 16 ’26: 36 h')).toBeInTheDocument()
+    expect(within(rowFor('Dee Data')).getAllByRole('listitem').map((li) => li.textContent))
+      .toEqual(['Nov 9 ’26: 36 h', 'Nov 16 ’26: 36 h', 'Nov 23 ’26: 36 h'])
+    expect(within(rowFor('Dee Data')).getAllByTestId('hours-meter')).toHaveLength(3)
 
     const field = screen.getByRole('textbox', { name: 'Threshold (hours per week)' })
     await user.clear(field)
@@ -131,9 +137,11 @@ describe('Reports: content', () => {
     expect(headersOf('Project budgets'))
       .toEqual(['Project', 'Team', 'Planned budget', 'Committed', 'Used to date', 'Used %', 'Budget', 'Note'])
     const cells = within(rowFor('Billing v2')).getAllByRole('cell').map((c) => c.textContent)
-    expect(cells).toEqual(['Platform', '12,000.00', '9,977.73', '3,090.78', '25.8%', 'Within budget', ''])
+    // The Budget column is the shared bar without words: 83% committed shows "Close to budget".
+    expect(cells).toEqual(['Platform', '$12,000.00', '$9,977.73', '$3,090.78', '25.8%', 'Close to budget', ''])
+    expect(within(rowFor('Billing v2')).getByTestId('budget-bar').querySelector('[data-kind="close"]')).toBeInTheDocument()
     const teams = screen.getByRole('table', { name: 'Team budgets' })
-    expect(within(rowFor('Platform', teams)).getByText('246,000.50')).toBeInTheDocument()
+    expect(within(rowFor('Platform', teams)).getByText('$246,000.50')).toBeInTheDocument()
   })
 
   it('budget flags a project whose committed cost is over its planned budget', async () => {
@@ -145,7 +153,7 @@ describe('Reports: content', () => {
     expect(within(rowFor('Billing v2')).getByText('Over budget')).toBeInTheDocument()
     expect(within(rowFor('Billing v2')).getByText('34.3%')).toBeInTheDocument()
     expect(within(rowFor('Data Lake')).getByText('Not set')).toBeInTheDocument()
-    expect(within(rowFor('Data Lake')).getByText('No planned budget')).toBeInTheDocument()
+    expect(within(rowFor('Data Lake')).getByText('No budget set')).toBeInTheDocument() // the shared budget bar's wording
     expect(within(rowFor('Data Lake')).getAllByRole('cell')[4]).toHaveTextContent('—') // no percent without a budget
   })
 

@@ -1,11 +1,16 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Context as ResponsiveContext } from 'react-responsive'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
+import { MASK, REVEAL_MS } from '../components/reveal'
 import { fakeAuthServer, reply } from '../test/fakeAuthServer'
+
+// The temporary password is random in the app; tests use a fixed stand-in.
+const STUB_PASSWORD = 'Stub-Temp-Pass-16'
+vi.mock('../components/tempPassword', () => ({ generatePassword: () => STUB_PASSWORD }))
 
 const USERS = {
   admin: { id: 'u-1', email: 'ada@acme.test', name: 'Ada Admin', role: 'admin', job_title: 'Head of Ops' },
@@ -62,7 +67,9 @@ describe('Employees page: what each role sees', () => {
 
     await table()
     expect(columnHeaders()).toEqual(['Name', 'Email', 'Job title', 'Team', 'Role', 'Salary', 'Actions'])
-    expect(within(rowFor('Eve Employee')).getByText('90,000.50')).toBeInTheDocument()
+    // Salaries are masked until asked for: the figure is not in the page at all.
+    expect(within(rowFor('Eve Employee')).getByLabelText('salary hidden')).toHaveTextContent(MASK)
+    expect(screen.getByRole('table', { name: 'Employees' })).not.toHaveTextContent(/90,000/)
     expect(screen.getByRole('button', { name: 'Add employee' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit Eve Employee' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Archive Eve Employee' })).toBeEnabled()
@@ -173,6 +180,26 @@ describe('errors', () => {
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
     expect(screen.queryByText(/raw: salary column/)).not.toBeInTheDocument()
   })
+
+  it('shows a skeleton while loading, and "Try again" after a failure loads the list again', async () => {
+    let listCalls = 0
+    const server = signedInAs('admin', {
+      'GET /api/employees/': () => {
+        listCalls += 1
+        return listCalls === 1 ? reply(503, { error: { code: 'unavailable', message: 'raw: down' } }) : reply(200, listFor('admin'))
+      },
+    })
+    renderApp('/employees')
+    expect(await screen.findByRole('status', { name: 'Loading employees' })).toHaveAttribute('aria-busy', 'true')
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await table()).toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByRole('button', { name: 'Show salary for Eve Employee' })).toBeInTheDocument()
+    expect(server.count('GET', '/api/employees/')).toBe(2)
+    expect(screen.queryByText('Something went wrong. Please try again.')).not.toBeInTheDocument()
+  })
 })
 
 describe('admin actions', () => {
@@ -190,7 +217,7 @@ describe('admin actions', () => {
     // Empty form: errors shown next to the fields, nothing sent.
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
     expect(within(dialog).getByText('Enter a name.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Use at least 12 characters.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Generate a temporary password first.')).toBeInTheDocument()
     expect(within(dialog).getByRole('textbox', { name: /name/i })).toHaveAttribute('aria-invalid', 'true')
     expect(server.count('POST', '/api/employees/')).toBe(0)
 
@@ -200,15 +227,15 @@ describe('admin actions', () => {
     await user.click(within(dialog).getByRole('combobox', { name: /role/i }))
     await user.click(await screen.findByRole('option', { name: 'Manager' }))
     await user.type(within(dialog).getByRole('textbox', { name: /salary/i }), '70000.5')
-    await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
+    await user.click(within(dialog).getByRole('button', { name: 'Generate temporary password' }))
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
-    expect(await screen.findByText('Nia New was added.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee added: Nia New')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const post = server.calls.find((c) => c.method === 'POST' && c.path === '/api/employees/')
     expect(post.body).toEqual({
       name: 'Nia New', email: 'nia@acme.test', job_title: 'Analyst', role: 'manager',
-      salary: 70000.5, password: 'Initial-Pass-2024',
+      salary: 70000.5, password: STUB_PASSWORD,
     })
     await waitFor(() => expect(server.count('GET', '/api/employees/')).toBe(2))
   })
@@ -227,7 +254,7 @@ describe('admin actions', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /email/i }), 'EVE@acme.test')
     await user.type(within(dialog).getByRole('textbox', { name: /job title/i }), 'Engineer')
     await user.type(within(dialog).getByRole('textbox', { name: /salary/i }), '1')
-    await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
+    await user.click(within(dialog).getByRole('button', { name: 'Generate temporary password' }))
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
     expect(await within(dialog).findByText('An employee with that email already exists.')).toBeInTheDocument()
@@ -253,9 +280,10 @@ describe('admin actions', () => {
     await user.type(jobTitle, 'Senior Engineer')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Eve Employee was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Eve Employee')).toBeInTheDocument()
     const put = server.calls.find((c) => c.method === 'PUT')
-    expect(put.body).toEqual({ name: 'Eve Employee', job_title: 'Senior Engineer', role: 'employee', salary: 90000.5 })
+    // The salary was never revealed or changed, so it is not sent.
+    expect(put.body).toEqual({ name: 'Eve Employee', job_title: 'Senior Engineer', role: 'employee' })
   })
 
   it('Archive asks first, then POSTs to /archive', async () => {
@@ -272,7 +300,7 @@ describe('admin actions', () => {
     expect(server.count('POST', '/api/employees/u-3/archive')).toBe(0)
 
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
-    expect(await screen.findByText('Eve Employee was archived.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee archived: Eve Employee')).toBeInTheDocument()
     expect(server.count('POST', '/api/employees/u-3/archive')).toBe(1)
   })
 
@@ -295,8 +323,84 @@ describe('admin actions', () => {
 
     const oldRow = await waitFor(() => rowFor('Old Timer'))
     expect(within(oldRow).getByText('Archived')).toBeInTheDocument()
-    expect(within(oldRow).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(oldRow).queryByRole('button', { name: /^(Edit|Archive) / })).not.toBeInTheDocument()
     expect(server.calls.at(-1).query).toBe('?include_archived=true')
+  })
+})
+
+describe('salary click-to-reveal (admin)', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('shows one salary on request, hides it again on request', async () => {
+    signedInAs('admin')
+    const user = userEvent.setup()
+    renderApp('/employees')
+    await table()
+    const row = rowFor('Eve Employee')
+    await user.click(within(row).getByRole('button', { name: 'Show salary for Eve Employee' }))
+    expect(within(row).getByText('$90,000.50')).toBeInTheDocument()
+    expect(within(rowFor('Max Manager')).queryByText(/120,000/)).not.toBeInTheDocument() // only the one asked for
+    await user.click(within(row).getByRole('button', { name: 'Hide salary for Eve Employee' }))
+    expect(within(row).queryByText(/90,000/)).not.toBeInTheDocument()
+  })
+
+  it('masks it again by itself after 30 seconds', async () => {
+    signedInAs('admin')
+    renderApp('/employees')
+    await table()
+    // Fake clock only from here, so the page loads normally first.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    fireEvent.click(within(rowFor('Eve Employee')).getByRole('button', { name: 'Show salary for Eve Employee' }))
+    expect(within(rowFor('Eve Employee')).getByText('$90,000.50')).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(REVEAL_MS - 1000))
+    expect(within(rowFor('Eve Employee')).getByText('$90,000.50')).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(1000))
+    expect(within(rowFor('Eve Employee')).queryByText(/90,000/)).not.toBeInTheDocument()
+  })
+
+  it('is masked again after leaving the page and coming back', async () => {
+    signedInAs('admin')
+    const user = userEvent.setup()
+    renderApp('/employees')
+    await table()
+    await user.click(within(rowFor('Eve Employee')).getByRole('button', { name: 'Show salary for Eve Employee' }))
+    expect(within(rowFor('Eve Employee')).getByText('$90,000.50')).toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    await user.click(within(nav).getByRole('link', { name: 'Teams' }))
+    await screen.findByRole('heading', { level: 1, name: 'Teams' })
+    await user.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Employees' }))
+    await table()
+    expect(within(rowFor('Eve Employee')).queryByText(/90,000/)).not.toBeInTheDocument()
+    expect(within(rowFor('Eve Employee')).getByRole('button', { name: 'Show salary for Eve Employee' })).toBeInTheDocument()
+  })
+
+  it('the edit dialog keeps the salary masked; revealing and changing it sends it', async () => {
+    const server = signedInAs('admin', {
+      'PUT /api/employees/u-3': (body) => reply(200, { ...USERS.employee, ...body }),
+    })
+    const user = userEvent.setup()
+    renderApp('/employees')
+    await table()
+    await user.click(screen.getByRole('button', { name: 'Edit Eve Employee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Eve Employee' })
+    expect(within(dialog).queryByRole('textbox', { name: /salary/i })).not.toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent(/90000|90,000/)
+    await user.click(within(dialog).getByRole('button', { name: 'Show salary for Eve Employee' }))
+    const salary = within(dialog).getByRole('textbox', { name: /salary/i })
+    expect(salary).toHaveValue('90,000.5') // shown with separators; sent as a number
+    await user.clear(salary)
+    await user.type(salary, '95000')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Employee updated: Eve Employee')).toBeInTheDocument()
+    expect(server.calls.find((c) => c.method === 'PUT').body).toMatchObject({ salary: 95000 })
+  })
+
+  it('managers get no salary, no mask and no eye button', async () => {
+    signedInAs('manager')
+    renderApp('/employees')
+    await table()
+    expect(screen.queryByRole('button', { name: /salary/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(MASK)).not.toBeInTheDocument()
   })
 })
 

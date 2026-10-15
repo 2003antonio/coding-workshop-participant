@@ -5,9 +5,10 @@ const project = (id) => `/projects/${seg(id)}`
 const deliverables = (projectId) => `${project(projectId)}/deliverables/`
 const deliverable = (projectId, id) => `${project(projectId)}/deliverables/${seg(id)}`
 
-/** GET /?team_id=&status=&include_archived= -> [project], filtered by what the caller may see */
-export async function listProjects(accessToken, { teamId, status, includeArchived = false } = {}) {
-  const query = toQuery({ team_id: teamId, status, include_archived: includeArchived })
+/** GET /?team_id=&status=&q=&include_archived= -> [project], filtered by what the caller may see.
+ *  q: search text for name or description (§4: trimmed, at most 100 characters); blank sends none. */
+export async function listProjects(accessToken, { teamId, status, q, includeArchived = false } = {}) {
+  const query = toQuery({ team_id: teamId, status, q: q?.trim(), include_archived: includeArchived })
   const data = await request(`/projects/${query}`, accessToken)
   return data.projects
 }
@@ -27,6 +28,11 @@ export function createProject(accessToken, fields) {
  *  end_date, planned_budget (null clears it); team_id admin only */
 export function updateProject(accessToken, id, changes) {
   return request(project(id), accessToken, { method: 'PUT', body: changes })
+}
+
+/** POST /{id}/unarchive (admin; the team's manager) -> the project, active again */
+export function unarchiveProject(accessToken, id) {
+  return request(`${project(id)}/unarchive`, accessToken, { method: 'POST' })
 }
 
 /** POST /{id}/archive -> the archived project (its deliverables and allocations go with it) */

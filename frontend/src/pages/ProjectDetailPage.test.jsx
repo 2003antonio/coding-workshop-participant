@@ -13,12 +13,12 @@ describe('Project detail: header and tabs', () => {
     expect(await screen.findByRole('heading', { name: 'Billing v2' })).toBeInTheDocument()
     expect(screen.getByText(/Platform · Manager: Max Manager · Nov 2, 2026 – Mar 31, 2027/)).toBeInTheDocument()
     expect(screen.getByText('New invoices')).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People', 'Budget'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People', 'Budget', 'Dependencies'])
 
     await user.click(screen.getByRole('button', { name: 'Archive project' }))
     const dialog = await screen.findByRole('dialog', { name: 'Archive Billing v2?' })
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
-    expect(await screen.findByText('Billing v2 was archived.')).toBeInTheDocument()
+    expect(await screen.findByText('Project archived: Billing v2')).toBeInTheDocument()
     expect(server.count('POST', '/api/projects/p-1/archive')).toBe(1)
     expect(await screen.findByText('Archived')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive project' })).not.toBeInTheDocument()
@@ -28,7 +28,7 @@ describe('Project detail: header and tabs', () => {
     const server = signedInAs('employee')
     const { user } = renderApp('/projects/p-1')
     await deliverablesTable()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Deliverables', 'People', 'Dependencies'])
     expect(headersOf('Deliverables')).toEqual(['Deliverable', 'Dates', 'Status', 'Depends on'])
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add deliverable|edit project|archive project|dependencies/i }))
@@ -79,7 +79,7 @@ describe('Project detail: deliverables', () => {
     const { user } = renderApp('/projects/p-1')
     await deliverablesTable()
     await choose(user, 'Status of Backend', 'Done')
-    expect(await screen.findByText('Backend is now done.')).toBeInTheDocument()
+    expect(await screen.findByText('Status changed: Backend is now done')).toBeInTheDocument()
     await waitFor(() => expect(within(rowFor('Frontend')).queryByText('Blocked')).not.toBeInTheDocument())
   })
 
@@ -91,7 +91,10 @@ describe('Project detail: deliverables', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add deliverable' })
 
     await user.type(within(dialog).getByRole('textbox', { name: /^name/i }), 'Launch')
+    // Both dates start filled in (today, moved inside the project), so clear them first.
+    await user.clear(within(dialog).getByLabelText(/start date/i))
     await user.type(within(dialog).getByLabelText(/start date/i), '2026-10-01')
+    await user.clear(within(dialog).getByLabelText(/due date/i))
     await user.type(within(dialog).getByLabelText(/due date/i), '2027-01-15')
     await user.click(within(dialog).getByRole('button', { name: 'Add deliverable' }))
     expect(within(dialog).getByText('Pick a date from Nov 2, 2026 to Mar 31, 2027.')).toBeInTheDocument()
@@ -103,7 +106,7 @@ describe('Project detail: deliverables', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /Backend/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Add deliverable' }))
 
-    expect(await screen.findByText('Launch was added.')).toBeInTheDocument()
+    expect(await screen.findByText('Deliverable added: Launch')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'POST' && c.path === '/api/projects/p-1/deliverables/').body).toEqual({
       name: 'Launch', description: '', start_date: '2027-01-04', due_date: '2027-01-15', depends_on: ['d-3', 'd-2'],
     })
@@ -135,7 +138,7 @@ describe('Project detail: deliverables', () => {
     await user.click(within(dialog).getByRole('checkbox', { name: /Backend/ }))
     await user.click(within(dialog).getByRole('checkbox', { name: /API spec/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Save dependencies' }))
-    expect(await screen.findByText('Dependencies of Frontend were saved.')).toBeInTheDocument()
+    expect(await screen.findByText('Dependencies saved: Frontend')).toBeInTheDocument()
     await waitFor(() => expect(within(rowFor('Frontend')).queryByText('Blocked')).not.toBeInTheDocument())
   })
 
@@ -153,7 +156,10 @@ describe('Project detail: people', () => {
     await openTab(user, 'People')
     await screen.findByRole('table', { name: 'Assignments' })
     expect(headersOf('Assignments')).toEqual(['Person', 'Hours per week', 'Dates', 'Weekly cost', 'Actions'])
-    expect(within(rowFor('Eve Employee')).getByText('865.39')).toBeInTheDocument() // 20 h × 90,000.50 / 2080
+    // Masked until the admin asks: 20 h × 90,000.50 / 2080.
+    expect(within(rowFor('Eve Employee')).queryByText(/865\.39/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show weekly cost for Eve Employee' }))
+    expect(within(rowFor('Eve Employee')).getByText('$865.39')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Assign person' }))
     const dialog = await screen.findByRole('dialog', { name: 'Assign someone to Billing v2' })
@@ -168,7 +174,7 @@ describe('Project detail: people', () => {
 
     // Eve already has 20 h here and 16 h on Data Lake in the week of Nov 16.
     expect(await within(dialog).findByText('This would put the person over 40 hours in some weeks.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16 (46 h)')).toBeInTheDocument()
+    expect(within(dialog).getByText('Over 40 hours in: week of Nov 16, 2026 (46 h)')).toBeInTheDocument()
     expect(within(dialog).queryByText(/Data Lake/)).not.toBeInTheDocument()
     expect(server.calls.at(-1).body).toEqual({
       employee_id: 'u-3', project_id: 'p-1', hours_per_week: 10, start_date: '2026-11-02', end_date: '2027-03-31',
@@ -193,12 +199,12 @@ describe('Project detail: people', () => {
     await user.clear(within(dialog).getByLabelText(/end date/i))
     await user.type(within(dialog).getByLabelText(/end date/i), '2026-12-18')
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }))
-    expect(await screen.findByText('Cy Coder was assigned.')).toBeInTheDocument()
+    expect(await screen.findByText('Person assigned: Cy Coder')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Remove Bo Builder' }))
     const confirm = await screen.findByRole('dialog', { name: 'Remove Bo Builder from Billing v2?' })
     await user.click(within(confirm).getByRole('button', { name: 'Remove' }))
-    expect(await screen.findByText('Bo Builder was removed from this project.')).toBeInTheDocument()
+    expect(await screen.findByText('Assignment removed: Bo Builder')).toBeInTheDocument()
     expect(server.count('POST', '/api/allocations/a-2/archive')).toBe(1)
     await waitFor(() => expect(screen.queryByRole('rowheader', { name: 'Bo Builder' })).not.toBeInTheDocument())
   })
@@ -235,7 +241,9 @@ describe('Project detail: budget', () => {
     expect(within(panel).getByText('Within budget')).toBeInTheDocument()
     expect(headersOf('Cost per assignment'))
       .toEqual(['Person', 'Hours per week', 'Weeks', 'Hourly rate', 'Committed', 'Used to date'])
-    expect(within(rowFor('Bo Builder')).getByText('40.00')).toBeInTheDocument()
+    expect(within(rowFor('Bo Builder')).queryByText(/40\.00/)).not.toBeInTheDocument() // masked until asked
+    await user.click(screen.getByRole('button', { name: 'Show hourly rate for Bo Builder' }))
+    expect(within(rowFor('Bo Builder')).getByText('$40.00')).toBeInTheDocument()
   })
 
   it('the manager sees totals only when at least 3 people are assigned', async () => {
@@ -243,8 +251,8 @@ describe('Project detail: budget', () => {
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'Budget')
     const panel = await screen.findByRole('region', { name: 'Project budget' })
-    expect(within(panel).getByText('12,000.00')).toBeInTheDocument()
-    expect(within(panel).getByText('9,977.73')).toBeInTheDocument()
+    expect(within(panel).getByText('$12,000.00')).toBeInTheDocument()
+    expect(within(panel).getByText('$9,977.73')).toBeInTheDocument()
     expect(within(panel).getByText(/3 people assigned/)).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Cost per assignment' })).not.toBeInTheDocument()
   })
@@ -331,7 +339,7 @@ describe('Project detail: edit and planned budget', () => {
     await user.type(budget, '5,000.50')
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Billing v2 was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Project updated: Billing v2')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT' && c.path === '/api/projects/p-1').body)
       .toEqual({ planned_budget: 5000.5 })
     const panel = await screen.findByRole('region', { name: 'Project budget' })
@@ -350,7 +358,7 @@ describe('Project detail: edit and planned budget', () => {
     await choose(user, /status/i, 'On hold', dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Billing v2 was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Project updated: Billing v2')).toBeInTheDocument()
     expect(server.calls.find((c) => c.method === 'PUT').body).toEqual({ status: 'on_hold', planned_budget: null })
     expect(await screen.findByText('On hold')).toBeInTheDocument()
   })
@@ -427,8 +435,8 @@ describe('salary data never reaches a non-admin screen', () => {
     await openTab(user, 'People')
     await screen.findByRole('table', { name: 'Assignments' })
     expect(screen.queryByRole('columnheader', { name: /cost|rate|salary/i })).not.toBeInTheDocument()
-    expect(screen.queryByText('865.39')).not.toBeInTheDocument()
-    expect(screen.queryByText('43.27')).not.toBeInTheDocument()
+    expect(screen.queryByText(/865\.39/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/43\.27/)).not.toBeInTheDocument()
   })
 
   it('a manager never sees hourly rates or per-person costs in the budget', async () => {
@@ -436,10 +444,90 @@ describe('salary data never reaches a non-admin screen', () => {
     const { user } = renderApp('/projects/p-1')
     await openTab(user, 'Budget')
     const panel = await screen.findByRole('region', { name: 'Project budget' })
-    expect(within(panel).getByText('9,977.73')).toBeInTheDocument() // totals are allowed
+    expect(within(panel).getByText('$9,977.73')).toBeInTheDocument() // totals are allowed
     expect(screen.queryByRole('table', { name: 'Cost per assignment' })).not.toBeInTheDocument()
     expect(screen.queryByText(/hourly rate/i)).not.toBeInTheDocument()
-    expect(screen.queryByText('43.27')).not.toBeInTheDocument()
-    expect(screen.queryByText('6,057.73')).not.toBeInTheDocument()
+    expect(screen.queryByText(/43\.27/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/6,057\.73/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Project detail: one refresh for the whole page', () => {
+  it('editing an assignment updates the header budget without a reload', async () => {
+    const server = signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    const summary = await screen.findByRole('region', { name: 'Budget summary' })
+    const before = (await within(summary).findByText(/^Committed /)).textContent
+    const budgetCalls = server.count('GET', '/api/projects/p-1/budget')
+
+    await user.click(await screen.findByRole('tab', { name: 'People' }))
+    await screen.findByRole('table', { name: 'Assignments' })
+    await user.click(screen.getByRole('button', { name: 'Edit assignment of Eve Employee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit assignment of Eve Employee' })
+    const hours = within(dialog).getByRole('textbox', { name: /hours per week/i })
+    await user.clear(hours)
+    await user.type(hours, '10')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(within(summary).getByText(/^Committed /).textContent).not.toBe(before))
+    expect(server.count('GET', '/api/projects/p-1/budget')).toBeGreaterThan(budgetCalls)
+  })
+})
+
+describe('Project detail: health strip', () => {
+  it('shows budget, schedule and people tiles to the manager; employees get no budget tile', async () => {
+    signedInAs('admin')
+    renderApp('/projects/p-1')
+    const strip = await screen.findByTestId('health-strip')
+    // The budget summary arrives with its own request: wait for it (this raced under a busy CPU).
+    await waitFor(() => expect(within(strip).getAllByRole('region').map((r) => r.getAttribute('aria-label')))
+      .toEqual(expect.arrayContaining(['Budget', 'Budget summary', 'Schedule', 'People'])))
+    expect(await within(strip).findByRole('list', { name: 'Deliverables by status' })).toBeInTheDocument()
+    expect(await within(strip).findByRole('img', { name: /^\d+ (person|people): / })).toBeInTheDocument()
+  })
+
+  it('an employee sees schedule and their own hours, never a budget', async () => {
+    const server = signedInAs('employee')
+    renderApp('/projects/p-1')
+    const strip = await screen.findByTestId('health-strip')
+    await within(strip).findByText(/^You, \d+ h this week$/)
+    expect(within(strip).queryByRole('region', { name: 'Budget' })).not.toBeInTheDocument()
+    expect(within(strip).queryByText(/\$/)).not.toBeInTheDocument()
+    expect(server.count('GET', '/api/projects/p-1/budget')).toBe(0)
+  })
+})
+
+describe('Project detail: row details', () => {
+  it('deliverable rows carry a status stripe and a due chip; people rows an avatar and an hours meter', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    await deliverablesTable()
+    const frontend = rowFor('Frontend')
+    expect(frontend).toHaveAttribute('data-accent', 'overdue')
+    expect(within(frontend).getByText(/^(Due |\d+ days? overdue$)/)).toBeInTheDocument()
+
+    await openTab(user, 'People')
+    await screen.findByRole('table', { name: 'Assignments' })
+    const eve = rowFor('Eve Employee')
+    expect(within(eve).getByRole('img', { name: '20 of 40 hours a week' })).toBeInTheDocument()
+    expect(eve.querySelector('[data-initials="EE"]')).toHaveAttribute('aria-hidden', 'true')
+  })
+})
+
+describe('Assign dialog: people grouped by team', () => {
+  it('admin sees the project team first, leads marked, then other teams, then No team', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/projects/p-1')
+    await openTab(user, 'People')
+    await user.click(await screen.findByRole('button', { name: 'Assign person' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Assign someone to Billing v2' })
+    await user.click(within(dialog).getByRole('combobox', { name: 'Person' }))
+    const listbox = await screen.findByRole('listbox')
+    const lines = [...listbox.children].map((li) => (li.getAttribute('role') === 'option' ? `  ${li.textContent}` : li.textContent))
+    expect(lines.slice(0, 5)).toEqual(['Platform', '  Max Manager (Delivery Lead) (Lead)', '  Eve Employee (Engineer)',
+      '  Bo Builder (Engineer)', '  Cy Coder (Designer)'])
+    expect(lines.filter((l) => !l.startsWith('  '))).toEqual(['Platform', 'Data', 'No team'])
+    expect(lines).toContain('  Mia Manager (Data Lead) (Lead)')
+    expect(screen.getByRole('option', { name: 'Nia New (Intern)' })).toBeInTheDocument()
   })
 })

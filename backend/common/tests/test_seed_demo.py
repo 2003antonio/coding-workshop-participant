@@ -173,3 +173,20 @@ def test_reset_refuses_when_other_accounts_exist(demo_env, capsys, make_employee
     assert seed_demo.main(["--reset"]) == 2
     assert "Refusing to reset" in capsys.readouterr().err
     assert _count("employees") == before
+
+
+def test_seed_leaves_a_believable_history_without_amounts(demo_env):
+    """The Activity screen is not empty after a seed: back-dated rows written through the
+    audit module, newest first a sign-in today, and never a salary or other amount."""
+    seed_demo.main([])
+    rows = db.query("SELECT action, details::text AS d, created_at FROM audit_log "
+                    "WHERE actor_id IS NOT NULL ORDER BY created_at")
+    assert len(rows) == len(seed_demo.HISTORY)
+    actions = {r["action"] for r in rows}
+    assert {"employee_created", "team_created", "project_created", "deliverable_archived",
+            "allocation_updated", "employee_salary_changed", "login_success"} <= actions
+    assert rows[0]["created_at"] < rows[-1]["created_at"]
+    salaries = [str(salary) for *_, salary in seed_demo.PEOPLE]
+    assert not any(s in (r["d"] or "") for r in rows for s in salaries)
+    archived = db.query_one("SELECT archived_at FROM deliverables WHERE name = 'Legacy CSV export'")
+    assert archived["archived_at"] is not None

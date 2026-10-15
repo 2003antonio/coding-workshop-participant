@@ -1,8 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { REFRESH_TOKEN_KEY } from '../auth/tokenStorage'
 import { reply, signedInAs } from '../test/fakeApiServer'
 import { choose, renderApp, rowFor } from '../test/renderApp'
+import { teamLabel } from './people'
+
+// The temporary password is random in the app; tests use a fixed stand-in.
+vi.mock('../components/tempPassword', () => ({ generatePassword: () => 'Stub-Temp-Pass-16' }))
 
 const table = () => screen.findByRole('table', { name: 'Employees' })
 const teamCell = (name) => within(rowFor(name)).getAllByRole('cell')[2] // email, job title, team
@@ -28,10 +32,10 @@ describe('Employees page: teams', () => {
     await user.type(within(dialog).getByRole('textbox', { name: /job title/i }), 'Engineer')
     await choose(user, /team/i, 'Data', dialog)
     await user.type(within(dialog).getByRole('textbox', { name: /salary/i }), '80000')
-    await user.type(within(dialog).getByLabelText(/initial password/i), 'Initial-Pass-2024')
+    await user.click(within(dialog).getByRole('button', { name: 'Generate temporary password' }))
     await user.click(within(dialog).getByRole('button', { name: 'Add employee' }))
 
-    expect(await screen.findByText('Kai Kim was added.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee added: Kai Kim')).toBeInTheDocument()
     const post = server.calls.find((c) => c.method === 'POST' && c.path === '/api/employees/')
     expect(post.body).not.toHaveProperty('team_id') // membership is not part of the employee record
     const member = server.calls.find((c) => c.path === '/api/teams/t-2/members')
@@ -49,7 +53,7 @@ describe('Employees page: teams', () => {
     await choose(user, /team/i, 'Data', dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Eve Employee was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Eve Employee')).toBeInTheDocument()
     const teamCalls = server.calls.filter((c) => c.path.includes('/members'))
     expect(teamCalls.map((c) => `${c.method} ${c.path}`))
       .toEqual(['DELETE /api/teams/t-1/members/u-3', 'POST /api/teams/t-2/members'])
@@ -63,7 +67,7 @@ describe('Employees page: teams', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Bo Builder' }))
     let dialog = await screen.findByRole('dialog', { name: 'Edit Bo Builder' })
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
-    await screen.findByText('Bo Builder was updated.')
+    await screen.findByText('Employee updated: Bo Builder')
     expect(server.calls.filter((c) => c.path.includes('/members'))).toHaveLength(0)
 
     await user.click(screen.getByRole('button', { name: 'Edit Bo Builder' }))
@@ -95,7 +99,7 @@ describe('Employees page: teams', () => {
     await choose(user, /team/i, 'Data', dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('Nia New was updated.')).toBeInTheDocument()
+    expect(await screen.findByText('Employee updated: Nia New')).toBeInTheDocument()
     expect(screen.getByText(
       'Nia New was saved, but their team was not changed: A team lead cannot also be a member of the team they lead.',
     )).toBeInTheDocument()
@@ -150,10 +154,10 @@ describe('access rules', () => {
     expect(server.count('GET', '/api/employees/')).toBe(0)
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Projects', 'Teams', 'Reports'])
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports'])
 
     await user.click(within(nav).getByRole('link', { name: 'Teams' }))
-    await screen.findByRole('table', { name: 'Teams' })
+    await screen.findByRole('list', { name: 'Teams' })
     expect(screen.queryByRole('button', { name: /new team/i })).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Platform' }))
     await screen.findByRole('heading', { name: 'Platform' })
@@ -164,12 +168,51 @@ describe('access rules', () => {
   it('on a phone the navigation is a menu with the same role-aware links', async () => {
     signedInAs('manager')
     const { user } = renderApp('/', { width: 400 })
-    await user.click(await screen.findByRole('button', { name: 'Menu' }))
-    const menu = await screen.findByRole('menu', { name: 'Menu' })
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent))
-      .toEqual(['Home', 'Projects', 'Teams', 'Reports', 'Employees'])
-    await user.click(within(menu).getByRole('menuitem', { name: 'Projects' }))
+    await screen.findByRole('heading', { name: /welcome/i })
+    expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(within(nav).getAllByRole('link').map((m) => m.textContent))
+      .toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports', 'Activity', 'Employees'])
+    await user.click(within(nav).getByRole('link', { name: 'Projects' }))
     expect(await screen.findByRole('heading', { name: 'Projects' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument())
     expect(window.localStorage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-1')
+  })
+})
+
+describe('Employees: row look', () => {
+  it('each row has an avatar beside the name, and role and team as chips', async () => {
+    signedInAs('admin')
+    renderApp('/employees')
+    await screen.findByRole('table', { name: 'Employees' })
+    const row = rowFor('Eve Employee')
+    expect(row.querySelector('[data-initials="EE"]')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(row).getByText('Employee').closest('.MuiChip-root')).toBeInTheDocument()
+    await waitFor(() => expect(within(row).getByText('Platform').closest('.MuiChip-root')).toBeInTheDocument())
+  })
+})
+
+describe('Employees: leads show their team', () => {
+  it('a lead shows "Leads <team>"; someone with no team and nothing to lead keeps "No team"', async () => {
+    signedInAs('admin')
+    const { user } = renderApp('/employees')
+    await table()
+    await waitFor(() => expect(teamCell('Max Manager')).toHaveTextContent('Leads Platform'))
+    expect(teamCell('Mia Manager')).toHaveTextContent('Leads Data')
+    expect(teamCell('Nia New')).toHaveTextContent('No team')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Max Manager' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Leads Platform. A lead is not a member of the team they lead.')).toBeInTheDocument()
+  })
+
+  it('teamLabel counts further teams as "+N"', () => {
+    const teams = [{ id: 't-1', name: 'Platform', lead: { id: 'u-2' } }, { id: 't-2', name: 'Data', lead: { id: 'u-2' } }]
+    expect(teamLabel({ id: 'u-2', team_id: null }, teams)).toEqual({ label: 'Leads Platform +1', kind: 'lead' })
+    expect(teamLabel({ id: 'u-9', team_id: 't-2' }, teams)).toEqual({ label: 'Data', kind: 'member' })
+    // A manager's list has only their own teams: another manager may lead one they can't see.
+    expect(teamLabel({ id: 'u-6', role: 'manager', team_id: null }, teams, false)).toEqual({ label: '—', kind: 'unknown' })
+    expect(teamLabel({ id: 'u-8', role: 'employee', team_id: null }, teams, false).label).toBe('No team')
   })
 })

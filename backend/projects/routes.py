@@ -138,6 +138,12 @@ def archive_project(params: dict, query: dict, body: object, headers: dict) -> d
     return responses.ok(services.archive_project(actor, validation.path_uuid(params)))
 
 
+def unarchive_project(params: dict, query: dict, body: object, headers: dict) -> dict:
+    actor = rbac.authenticate_request(headers)
+    rbac.require_min_role(actor, "manager")
+    return responses.ok(services.unarchive_project(actor, validation.path_uuid(params)))
+
+
 def project_budget(params: dict, query: dict, body: object, headers: dict) -> dict:
     actor = rbac.authenticate_request(headers)
     rbac.require_min_role(actor, "employee")
@@ -206,6 +212,7 @@ ROUTES = {
     ("GET", "/{id}"): get_project,
     ("PUT", "/{id}"): update_project,
     ("POST", "/{id}/archive"): archive_project,
+    ("POST", "/{id}/unarchive"): unarchive_project,
     ("GET", "/{id}/budget"): project_budget,
     ("GET", "/{id}/deliverables"): list_deliverables,
     ("POST", "/{id}/deliverables"): create_deliverable,
