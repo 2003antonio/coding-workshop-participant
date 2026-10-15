@@ -153,7 +153,7 @@ describe('access rules', () => {
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'My work', 'Projects', 'Teams', 'Reports'])
 
     await user.click(within(nav).getByRole('link', { name: 'Teams' }))
-    await screen.findByRole('table', { name: 'Teams' })
+    await screen.findByRole('list', { name: 'Teams' })
     expect(screen.queryByRole('button', { name: /new team/i })).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Platform' }))
     await screen.findByRole('heading', { name: 'Platform' })
@@ -174,5 +174,17 @@ describe('access rules', () => {
     expect(await screen.findByRole('heading', { name: 'Projects' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument())
     expect(window.localStorage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-1')
+  })
+})
+
+describe('Employees: row look', () => {
+  it('each row has an avatar beside the name, and role and team as chips', async () => {
+    signedInAs('admin')
+    renderApp('/employees')
+    await screen.findByRole('table', { name: 'Employees' })
+    const row = rowFor('Eve Employee')
+    expect(row.querySelector('[data-initials="EE"]')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(row).getByText('Employee').closest('.MuiChip-root')).toBeInTheDocument()
+    await waitFor(() => expect(within(row).getByText('Platform').closest('.MuiChip-root')).toBeInTheDocument())
   })
 })

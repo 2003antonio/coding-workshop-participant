@@ -26,6 +26,7 @@ import AppShell from '../components/AppShell'
 import EmployeeFormDialog from '../components/EmployeeFormDialog'
 import MaskedMoney from '../components/MaskedMoney'
 import PageHeader from '../components/PageHeader'
+import { PersonName } from '../components/viz/Avatar'
 import { LoadState } from '../components/PageState'
 import * as employeeService from '../services/employeeService'
 import * as teamService from '../services/teamService'
@@ -34,6 +35,8 @@ import { messageFor } from './employeeMessages'
 import { teamName } from './people'
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', employee: 'Employee' }
+/** Role chips: outlined, so they never read as a status; the label says the role. */
+const ROLE_COLORS = { admin: 'primary', manager: 'secondary', employee: 'default' }
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** Ask before archiving; the record is kept, the person can no longer sign in. */
@@ -216,7 +219,7 @@ export default function EmployeesPage() {
                   <TableRow key={employee.id} hover>
                     <TableCell component="th" scope="row">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        {employee.name}
+                        <PersonName name={employee.name} size={30} />
                         {archived && <Chip label="Archived" size="small" />}
                       </Box>
                       {isPhone && (
@@ -231,8 +234,16 @@ export default function EmployeesPage() {
                     </TableCell>
                     {!isPhone && <TableCell>{employee.email}</TableCell>}
                     {!isPhone && <TableCell>{employee.job_title}</TableCell>}
-                    {!isPhone && <TableCell>{teamName(employee.team_id, teams ?? [])}</TableCell>}
-                    <TableCell>{ROLE_LABELS[employee.role] ?? employee.role}</TableCell>
+                    {!isPhone && (
+                      <TableCell>
+                        <Chip size="small" variant="outlined" label={teamName(employee.team_id, teams ?? [])}
+                          sx={{ fontWeight: 500, color: employee.team_id ? 'text.primary' : 'text.secondary' }} />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Chip size="small" variant="outlined" color={ROLE_COLORS[employee.role] ?? 'default'}
+                        label={ROLE_LABELS[employee.role] ?? employee.role} />
+                    </TableCell>
                     {isAdmin && (
                       <TableCell align="right">
                         <MaskedMoney amount={employee.salary} format={money.format} what="salary" name={employee.name} />

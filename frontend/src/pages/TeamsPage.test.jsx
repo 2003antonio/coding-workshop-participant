@@ -1,17 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { reply, signedInAs } from '../test/fakeApiServer'
-import { choose, headersOf, renderApp, rowFor } from '../test/renderApp'
+import { choose, renderApp, rowFor } from '../test/renderApp'
 
 describe('Teams list', () => {
   it('admin sees every team with lead and member count, and can create one', async () => {
     const server = signedInAs('admin')
     const { user } = renderApp('/teams')
 
-    await screen.findByRole('table', { name: 'Teams' })
-    expect(headersOf('Teams')).toEqual(['Team', 'Lead', 'Members'])
-    expect(within(rowFor('Platform')).getByText('Max Manager')).toBeInTheDocument()
-    expect(within(rowFor('Data')).getByText('1')).toBeInTheDocument()
+    // One card per team: lead, members as avatars and their count.
+    const cards = await screen.findByRole('list', { name: 'Teams' })
+    const card = (name) => within(cards).getByRole('link', { name }).closest('li')
+    expect(within(card('Platform')).getByText('Max Manager')).toBeInTheDocument()
+    expect(await within(card('Data')).findByText('1 member')).toBeInTheDocument()
+    expect(await within(card('Platform')).findByRole('img', { name: /^\d+ (person|people): / })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'New team' }))
     const dialog = await screen.findByRole('dialog', { name: 'New team' })
@@ -49,7 +51,7 @@ describe('Teams list', () => {
   it('manager sees only the teams they lead, with no admin buttons', async () => {
     const server = signedInAs('manager')
     renderApp('/teams')
-    await screen.findByRole('table', { name: 'Teams' })
+    await screen.findByRole('list', { name: 'Teams' })
     expect(screen.getByRole('link', { name: 'Platform' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Data' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New team' })).not.toBeInTheDocument()

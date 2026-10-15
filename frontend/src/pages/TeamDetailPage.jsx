@@ -15,6 +15,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import PageHeader from '../components/PageHeader'
 import { LoadError, LoadState, LoadingSkeleton } from '../components/PageState'
 import ResponsiveTable from '../components/ResponsiveTable'
+import { PersonName } from '../components/viz/Avatar'
+import ProjectTile from '../components/viz/ProjectTile'
 import { AddMemberDialog, TeamFormDialog } from '../components/TeamDialogs'
 import * as budgetService from '../services/budgetService'
 import * as employeeService from '../services/employeeService'
@@ -97,7 +99,7 @@ export default function TeamDetailPage() {
       <LoadState result={team} label="Loading team" skeleton="detail">
         {(data) => (
           <Stack spacing={3}>
-            <PageHeader title={data.name} subtitle={`Lead: ${data.lead?.name ?? 'none'}`}
+            <PageHeader title={data.name} subtitle={`Lead: ${data.lead?.name ?? 'none'}`} icon={<ProjectTile name={data.name} size={48} />}
               actions={isAdmin && !data.archived_at && (
                 <>
                   <Button variant="outlined" onClick={() => setDialog({ kind: 'edit' })}
@@ -121,7 +123,7 @@ export default function TeamDetailPage() {
                 Members ({data.member_count})
               </Typography>
               <ResponsiveTable label="Members" rows={data.members ?? []} empty="No members yet." columns={[
-                { key: 'name', label: 'Name', primary: true, render: (m) => m.name },
+                { key: 'name', label: 'Name', primary: true, render: (m) => <PersonName name={m.name} /> },
                 { key: 'job', label: 'Job title', render: (m) => m.job_title },
                 { key: 'role', label: 'Role', render: (m) => ROLE_LABELS[m.role] ?? m.role },
                 { key: 'actions', label: 'Actions', align: 'right', hidden: !isAdmin || Boolean(data.archived_at),
