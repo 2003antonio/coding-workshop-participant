@@ -13,6 +13,8 @@ import AppShell from '../components/AppShell'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 import Paginated from '../components/Paginated'
+import { FilterBar, SearchField } from '../components/filters/Filters'
+import { emptyText, matches, searchTerm } from '../components/filters/filterMath'
 import { useToast } from '../components/toast/toast'
 import { LoadState } from '../components/PageState'
 import { useMotion } from '../components/motion/motion'
@@ -73,6 +75,7 @@ export default function TeamsPage() {
   const api = useApi()
   const isAdmin = canManageTeams(role)
   const [creating, setCreating] = useState(false)
+  const [search, setSearch] = useState('')
   const toast = useToast()
 
   // The list has member counts only; each team's own page has the names for the avatar stack
@@ -96,7 +99,7 @@ export default function TeamsPage() {
     teams.reload()
   }
 
-  const emptyText = {
+  const noTeams = {
     admin: 'No teams yet. Create the first one.',
     manager: "You don't lead any teams yet.",
     employee: "You aren't on a team yet.",
@@ -110,12 +113,19 @@ export default function TeamsPage() {
             New team
           </Button>
         )} />
+      <FilterBar label="Filter teams" columns="minmax(0, 32rem)">
+        <SearchField label="Search teams" value={search} onChange={setSearch} />
+      </FilterBar>
       <LoadState result={teams} label="Loading teams" skeleton="cards">
-        {(rows) => (
-          <Paginated rows={rows} label="Teams" pageSize={12} pageSizes={TEAM_PAGE_SIZES}>
-            {(pageRows) => <TeamCards rows={pageRows} empty={emptyText} />}
-          </Paginated>
-        )}
+        {(all) => {
+          const term = searchTerm(search)
+          const rows = all.filter((t) => matches(term, t.name, t.lead?.name, ...(t.members ?? []).map((m) => m.name)))
+          return (
+            <Paginated rows={rows} label="Teams" pageSize={12} pageSizes={TEAM_PAGE_SIZES}>
+              {(pageRows) => <TeamCards rows={pageRows} empty={emptyText('teams', { term, none: noTeams })} />}
+            </Paginated>
+          )
+        }}
       </LoadState>
       {creating && (
         <TeamFormDialog leads={leadCandidates(people.data ?? [])} onClose={() => setCreating(false)}

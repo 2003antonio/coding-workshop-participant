@@ -25,7 +25,7 @@ request with `apiClient.js`.
 | Folder or file | What it holds |
 |---|---|
 | `src/pages/` | One file per screen (`ProjectsPage.jsx`, ...) plus display helpers (`format.js`, `apiMessages.js`). |
-| `src/components/` | Shared pieces: `AppShell` (sidebar + top bar), `PageState` (loading / error / empty), `ResponsiveTable` (table on desktop, cards on a phone), dialogs, report views. |
+| `src/components/` | Shared pieces: `AppShell` (sidebar + top bar), `PageState` (loading / error / empty), `ResponsiveTable` (table on desktop, cards on a phone, paged), `Paginated` (any long list a page at a time), `filters/` (the search and filter row), dialogs, report views. |
 | `src/services/` | One file per backend area (`teamService.js`, `projectService.js`, ...). `apiClient.js` has `request()` and `toQuery()`. |
 | `src/auth/` | `AuthContext` (the session), `useApi` / `useLoad`, `roles.js` (which role sees what), `ProtectedRoute`. |
 | `src/hooks/useBreakpoint.js` | `{ isPhone, isTablet, isDesktop }` for layout decisions. |
@@ -138,6 +138,31 @@ component is right in both modes for free.
 
 Phone: check it at 390 px wide. Use `useBreakpoint()` and `ResponsiveTable`
 (it turns rows into cards on a phone).
+
+### Long lists: search, filters and pages
+
+Lists arrive whole from the API (only the activity feed pages on the server), so a
+page filters and pages them in the browser, always in this order:
+
+```jsx
+<FilterBar label="Filter employees" columns="2fr 1fr 1fr auto">      {/* components/filters/Filters.jsx */}
+  <SearchField label="Search employees" value={search} onChange={setSearch} />
+  <SelectFilter label="Role" allLabel="All roles" value={role} onChange={setRole} options={optionsOf(ROLE_LABELS)} />
+  <SwitchFilter label="Show archived" checked={archived} onChange={setArchived} />
+</FilterBar>
+...
+const term = searchTerm(search)                                     // components/filters/filterMath.js
+const rows = all.filter((e) => matches(term, e.name, e.email) && (!role || e.role === role))
+<ResponsiveTable rows={rows} empty={emptyText('employees', { term, filtered: Boolean(role), none: 'No employees yet.' })} ... />
+```
+
+- `ResponsiveTable` pages by itself (25 rows). Anything else long goes inside
+  `<Paginated rows={rows} label="Teams">{(pageRows) => ...}</Paginated>`; a filter
+  that changes the row count sends it back to page 1.
+- `matches` works like the server's `q`: case-insensitive, plain text. A list the
+  server can search (Projects) sends `q` after `SEARCH_DELAY_MS` instead.
+- Keep the names: the bar is "Filter <things>", the box "Search <things>", the
+  first dropdown choice "All <things>". Tests and E2E find them by these names.
 
 ## 5. Add a test
 

@@ -1,23 +1,23 @@
 // One component per report in docs/api-contract.md §8. Each loads its own data
 // and shows loading, empty and error states. Money follows the hiding rule.
 import { useCallback, useState } from 'react'
+import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
-import FormControlLabel from '@mui/material/FormControlLabel'
 import Link from '@mui/material/Link'
-import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
-import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { Link as RouterLink } from 'react-router-dom'
 import { useLoad } from '../auth/useApi'
 import * as projectService from '../services/projectService'
 import * as reportService from '../services/reportService'
+import * as teamService from '../services/teamService'
 import {
-  RISK_REASONS, formatDate, formatMoney, formatPercent, formatWeek, formatWeekShort, hiddenMessage,
+  DELIVERABLE_STATUS, PROJECT_STATUS, RISK_REASONS, formatDate, formatMoney, formatPercent, formatWeek,
+  formatWeekShort, hiddenMessage,
 } from '../pages/format'
 import { useBreakpoint } from '../hooks/useBreakpoint'
 import { toneSx } from '../theme'
@@ -26,6 +26,8 @@ import BudgetFlag from './BudgetFlag'
 import CapacityHeatmap, { HeatLegend } from './heatmap/CapacityHeatmap'
 import { shiftWeek } from './heatmap/heatScale'
 import { Empty, LoadState } from './PageState'
+import { FilterBar, SearchField, SelectFilter, SwitchFilter } from './filters/Filters'
+import { emptyText, matches, optionsFrom, optionsOf, searchTerm } from './filters/filterMath'
 import Paginated from './Paginated'
 import ResponsiveTable from './ResponsiveTable'
 import StatusChip from './StatusChip'
@@ -39,15 +41,35 @@ const money = (amount) => (amount === null || amount === undefined ? '—' : for
 const DEFAULT_THRESHOLD = 32
 const PICK_PROJECT = 'Choose a project to see its dependency chain.'
 const RESOURCE_WEEKS = 12 // the server's default window (§8)
+/** The Team filter's choice for people on no team. */
+const NO_TEAM = 'none'
+/** Team filter options from report rows that carry a `team`. */
+const teamsIn = (rows) => optionsFrom(rows ?? [], (r) => r.team && { value: r.team.id, label: r.team.name })
 
 /** 1. Project status: progress and deliverable counts per project. */
 export function ProjectStatusReport() {
   const load = useCallback((call) => call((token) => reportService.projectStatus(token)), [])
   const result = useLoad(load)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [teamId, setTeamId] = useState('')
   return (
+    <>
+      <FilterBar label="Filter project status" columns="2fr 1fr 1fr">
+        <SearchField label="Search projects" value={search} onChange={setSearch} />
+        <SelectFilter label="Status" allLabel="All statuses" value={status} onChange={setStatus}
+          options={optionsOf(PROJECT_STATUS)} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
+          options={teamsIn(result.data?.projects)} />
+      </FilterBar>
     <LoadState result={result} label="Loading project status" skeleton="table">
-      {(data) => (
-        <ResponsiveTable label="Project status" rows={data.projects} empty="No projects to report on."
+      {(data) => {
+        const term = searchTerm(search)
+        const rows = data.projects.filter((p) => matches(term, p.name, p.team?.name)
+          && (!status || p.status === status) && (!teamId || p.team?.id === teamId))
+        return (
+        <ResponsiveTable label="Project status" rows={rows}
+          empty={emptyText('projects', { term, filtered: Boolean(status || teamId), none: 'No projects to report on.' })}
           columns={[
             { key: 'name', label: 'Project', primary: true, render: (p) => <ProjectName name={p.name}>{projectLink(p)}</ProjectName> },
             { key: 'team', label: 'Team', render: (p) => p.team?.name },
@@ -72,8 +94,10 @@ export function ProjectStatusReport() {
             { key: 'overdue', label: 'Overdue', align: 'right', render: (p) => p.deliverables.overdue },
             { key: 'blocked', label: 'Blocked', align: 'right', render: (p) => p.deliverables.blocked },
           ]} />
-      )}
+        )
+      }}
     </LoadState>
+    </>
   )
 }
 
@@ -84,10 +108,30 @@ const CARD_PAGE_SIZES = [10, 25, 50]
 export function AtRiskReport() {
   const load = useCallback((call) => call((token) => reportService.atRiskProjects(token)), [])
   const result = useLoad(load)
+  const [search, setSearch] = useState('')
+  const [reason, setReason] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const filter = (projects) => {
+    const term = searchTerm(search)
+    const rows = projects.filter((p) => matches(term, p.name, p.team?.name, p.manager?.name)
+      && (!reason || p.reasons.includes(reason)) && (!teamId || p.team?.id === teamId))
+    const none = 'No projects are at risk right now.'
+    return { rows, empty: emptyText('at-risk projects', { term, filtered: Boolean(reason || teamId), none }) }
+  }
   return (
+    <>
+      <FilterBar label="Filter at-risk projects" columns="2fr 1fr 1fr">
+        <SearchField label="Search at-risk projects" value={search} onChange={setSearch} />
+        <SelectFilter label="Reason" allLabel="All reasons" value={reason} onChange={setReason}
+          options={optionsOf(RISK_REASONS)} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
+          options={teamsIn(result.data?.projects)} />
+      </FilterBar>
     <LoadState result={result} label="Loading at-risk projects" skeleton="cards">
-      {(data) => (data.projects.length === 0 ? <Empty>No projects are at risk right now.</Empty> : (
-        <Paginated rows={data.projects} label="At-risk projects" pageSize={10} pageSizes={CARD_PAGE_SIZES}>
+      {(data) => {
+        const { rows, empty } = filter(data.projects)
+        return (rows.length === 0 ? <Empty>{empty}</Empty> : (
+        <Paginated rows={rows} label="At-risk projects" pageSize={10} pageSizes={CARD_PAGE_SIZES}>
         {(projects) => (
         <Stack component="ul" aria-label="At-risk projects" spacing={1.5} sx={{ listStyle: 'none', p: 0, m: 0 }}>
           {projects.map((p) => (
@@ -107,8 +151,10 @@ export function AtRiskReport() {
         </Stack>
         )}
         </Paginated>
-      ))}
+        ))
+      }}
     </LoadState>
+    </>
   )
 }
 
@@ -121,10 +167,20 @@ export function ResourcesReport() {
     [from],
   )
   const result = useLoad(load)
+  const loadTeams = useCallback((call) => call((token) => teamService.listTeams(token)), [])
+  const teams = useLoad(loadTeams)
+  const [search, setSearch] = useState('')
+  const [teamId, setTeamId] = useState('') // a team id, NO_TEAM, or '' for everyone
   const first = result.data?.weeks?.[0]
   const span = result.data?.weeks?.length || RESOURCE_WEEKS
   return (
     <>
+      <FilterBar label="Filter people" columns="2fr 1fr">
+        <SearchField label="Search people" value={search} onChange={setSearch} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
+          options={[{ value: NO_TEAM, label: 'No team' },
+            ...optionsFrom(teams.data ?? [], (t) => ({ value: t.id, label: t.name }))]} />
+      </FilterBar>
       <Box component="nav" aria-label="Weeks shown" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 }}>
         <Button size="small" variant="outlined" sx={{ minHeight: 44 }} disabled={!first}
           onClick={() => setFrom(shiftWeek(first, -span))}>
@@ -137,17 +193,23 @@ export function ResourcesReport() {
         {from && <Button size="small" sx={{ minHeight: 44 }} onClick={() => setFrom(null)}>This week</Button>}
       </Box>
       <LoadState result={result} label="Loading resource allocation" skeleton="table">
-        {(data) => (data.people.length === 0 ? <Empty>No one to show.</Empty> : (
+        {(data) => {
+          const term = searchTerm(search)
+          const people = data.people.filter((p) => matches(term, p.name)
+            && (!teamId || (teamId === NO_TEAM ? !p.team_id : p.team_id === teamId)))
+          return (people.length === 0
+            ? <Empty>{emptyText('people', { term, filtered: Boolean(teamId), none: 'No one to show.' })}</Empty> : (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Hours per week, from the {formatWeek(first)}. “Other projects” is time on projects you can’t see.
             </Typography>
-            <Paginated rows={data.people} label="People">
+            <Paginated rows={people} label="People">
               {(people) => <CapacityHeatmap weeks={data.weeks} people={people} isPhone={isPhone} />}
             </Paginated>
             <HeatLegend />
           </>
-        ))}
+          ))
+        }}
       </LoadState>
     </>
   )
@@ -161,15 +223,25 @@ export function DeliverablesReport() {
     [overdueOnly],
   )
   const result = useLoad(load)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
   return (
     <>
-      <FormControlLabel label="Only overdue" sx={{ mb: 1 }} control={
-        <Switch checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} />
-      } />
+      <FilterBar label="Filter deliverables" columns="2fr 1fr auto">
+        <SearchField label="Search deliverables" value={search} onChange={setSearch} />
+        <SelectFilter label="Status" allLabel="All statuses" value={status} onChange={setStatus}
+          options={optionsOf(DELIVERABLE_STATUS)} />
+        <SwitchFilter label="Only overdue" checked={overdueOnly} onChange={setOverdueOnly} />
+      </FilterBar>
       <LoadState result={result} label="Loading deliverable status" skeleton="table">
-        {(data) => (
-          <ResponsiveTable label="Deliverable status" rows={data.deliverables}
-            empty={overdueOnly ? 'Nothing is overdue.' : 'No deliverables to report on.'}
+        {(data) => {
+          const term = searchTerm(search)
+          const rows = data.deliverables.filter((d) => matches(term, d.name, d.project?.name)
+            && (!status || d.status === status))
+          const none = overdueOnly ? 'Nothing is overdue.' : 'No deliverables to report on.'
+          return (
+          <ResponsiveTable label="Deliverable status" rows={rows}
+            empty={emptyText('deliverables', { term, filtered: Boolean(status), none })}
             columns={[
               { key: 'name', label: 'Deliverable', primary: true, render: (d) => d.name },
               { key: 'project', label: 'Project', render: (d) => projectLink(d.project) },
@@ -186,7 +258,8 @@ export function DeliverablesReport() {
                 d.blocking.length ? `${d.blocking.length} ${d.blocking.length === 1 ? 'deliverable' : 'deliverables'}` : '—'
               ) },
             ]} />
-        )}
+          )
+        }}
       </LoadState>
     </>
   )
@@ -197,6 +270,7 @@ export function CapacityReport() {
   const [input, setInput] = useState(String(DEFAULT_THRESHOLD))
   const valid = /^\d+$/.test(input.trim()) && Number(input) >= 1 && Number(input) <= 40
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
+  const [search, setSearch] = useState('')
   const load = useCallback((call) => call((token) => reportService.overAllocated(token, { threshold })), [threshold])
   const result = useLoad(load)
 
@@ -208,15 +282,20 @@ export function CapacityReport() {
 
   return (
     <>
-      <TextField label="Threshold (hours per week)" value={input} onChange={handleChange} size="small"
-        error={!valid} sx={{ mb: 2, maxWidth: 280 }}
-        helperText={valid ? 'People above this in any week are listed. 40 should list no one.'
-          : 'Enter whole hours from 1 to 40.'}
-        slotProps={{ htmlInput: { inputMode: 'numeric' } }} />
+      <FilterBar label="Filter near capacity" columns="2fr 1fr" align="start">
+        <SearchField label="Search people" value={search} onChange={setSearch} />
+        <TextField label="Threshold (hours per week)" value={input} onChange={handleChange} size="small"
+          error={!valid}
+          helperText={valid ? 'People above this in any week are listed. 40 should list no one.'
+            : 'Enter whole hours from 1 to 40.'}
+          slotProps={{ htmlInput: { inputMode: 'numeric' } }} />
+      </FilterBar>
       <LoadState result={result} label="Loading near-capacity report" skeleton="table">
-        {(data) => (
-          <ResponsiveTable label="Near capacity" rows={data.people}
-            empty={`No one is above ${data.threshold} hours in any week.`}
+        {(data) => {
+          const term = searchTerm(search)
+          return (
+          <ResponsiveTable label="Near capacity" rows={data.people.filter((p) => matches(term, p.name))}
+            empty={emptyText('people', { term, none: `No one is above ${data.threshold} hours in any week.` })}
             columns={[
               { key: 'name', label: 'Person', primary: true, render: (p) => <PersonName name={p.name} /> },
               { key: 'weeks', label: `Weeks above ${data.threshold} h`, render: (p) => (
@@ -230,7 +309,8 @@ export function CapacityReport() {
                 </Box>
               ) },
             ]} />
-        )}
+          )
+        }}
       </LoadState>
     </>
   )
@@ -251,10 +331,11 @@ export function ChainReport() {
     <LoadState result={projects} label="Loading projects" skeleton="list">
       {(list) => (list.length === 0 ? <Empty>No projects to show.</Empty> : (
         <>
-          <TextField select label="Project" size="small" value={projectId} sx={{ mb: 2, minWidth: 240 }}
-            onChange={(e) => setProjectId(e.target.value)}>
-            {list.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-          </TextField>
+          <Autocomplete options={list} value={list.find((p) => p.id === projectId) ?? null} size="small"
+            onChange={(_, p) => setProjectId(p?.id ?? '')} sx={{ mb: 2, maxWidth: 420 }}
+            getOptionLabel={(p) => p.name} getOptionKey={(p) => p.id} isOptionEqualToValue={(a, b) => a.id === b.id}
+            noOptionsText="No projects match."
+            renderInput={(params) => <TextField {...params} label="Project" />} />
           {!projectId ? <Empty>{PICK_PROJECT}</Empty> : (
             <LoadState result={chain} label="Loading dependency chain" skeleton="table">
               {(data) => {
@@ -296,14 +377,30 @@ export function ChainReport() {
 export function BudgetReport() {
   const load = useCallback((call) => call((token) => reportService.budgetReport(token)), [])
   const result = useLoad(load)
+  const [search, setSearch] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const [overOnly, setOverOnly] = useState(false)
   const note = (row) => (row.hidden_reason ? hiddenMessage(row.hidden_reason) : '')
   return (
+    <>
+      <FilterBar label="Filter budgets" columns="2fr 1fr auto">
+        <SearchField label="Search budgets" value={search} onChange={setSearch} />
+        <SelectFilter label="Team" allLabel="All teams" value={teamId} onChange={setTeamId}
+          options={optionsFrom(result.data?.teams ?? [], (t) => ({ value: t.id, label: t.name }))} />
+        <SwitchFilter label="Only over budget" checked={overOnly} onChange={setOverOnly} />
+      </FilterBar>
     <LoadState result={result} label="Loading budget report" skeleton="table">
-      {(data) => (
+      {(data) => {
+        const term = searchTerm(search)
+        const projects = data.projects.filter((p) => matches(term, p.name, p.team?.name)
+          && (!teamId || p.team?.id === teamId) && (!overOnly || p.over_budget === true))
+        const teams = data.teams.filter((t) => matches(term, t.name) && (!teamId || t.id === teamId))
+        return (
         <Stack spacing={3}>
           <Box component="section" aria-labelledby="budget-projects-heading">
             <Typography id="budget-projects-heading" variant="h6" component="h2" gutterBottom>Projects</Typography>
-            <ResponsiveTable label="Project budgets" rows={data.projects} empty="No projects to report on."
+            <ResponsiveTable label="Project budgets" rows={projects}
+              empty={emptyText('projects', { term, filtered: Boolean(teamId || overOnly), none: 'No projects to report on.' })}
               columns={[
                 { key: 'name', label: 'Project', primary: true, render: projectLink },
                 { key: 'team', label: 'Team', render: (p) => p.team?.name },
@@ -320,7 +417,8 @@ export function BudgetReport() {
           </Box>
           <Box component="section" aria-labelledby="budget-teams-heading">
             <Typography id="budget-teams-heading" variant="h6" component="h2" gutterBottom>Teams</Typography>
-            <ResponsiveTable label="Team budgets" rows={data.teams} empty="No teams to report on."
+            <ResponsiveTable label="Team budgets" rows={teams}
+              empty={emptyText('teams', { term, filtered: Boolean(teamId), none: 'No teams to report on.' })}
               columns={[
                 { key: 'name', label: 'Team', primary: true, render: (t) => t.name },
                 { key: 'weekly', label: 'Weekly', align: 'right', render: (t) => money(t.weekly) },
@@ -329,7 +427,9 @@ export function BudgetReport() {
               ]} />
           </Box>
         </Stack>
-      )}
+        )
+      }}
     </LoadState>
+    </>
   )
 }
