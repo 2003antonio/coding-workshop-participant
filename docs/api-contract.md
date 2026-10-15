@@ -358,6 +358,40 @@ with its week. `from` after `to`, or more than 52 weeks → `400 invalid_range`;
    `teams`: admin all active teams, a manager the teams they lead; hidden below
    `MIN_AGGREGATE_GROUP` members exactly as in §7. No per-person lines here, even for admin.
 
+8. **Activity** — `/activity?limit=&offset=&type=` — admin, manager (employees `403`).
+   Who did what and when, read from `audit_log` (newest first). Read-only.
+   ```json
+   { "activity": [{ "id": "uuid", "occurred_at": "2026-10-14T21:05:00+00:00",
+                    "actor": { "id": "uuid", "name": "Alex Admin", "role": "admin" },
+                    "action": "deliverable_archived", "type": "deliverables",
+                    "entity_type": "deliverable", "entity_id": "uuid",
+                    "sentence": "Alex Admin archived deliverable 'API design'" }],
+     "total": 42, "limit": 50, "offset": 0 }
+   ```
+   - `limit`: 1–100, default 50. `offset`: 0 or more, default 0. Anything else → `400 bad_request`.
+   - `type`: one of `people`, `teams`, `projects`, `deliverables`, `assignments`, `sign-ins`
+     (anything else → `400 bad_request`). Without it, every type the caller may see.
+   - `actor` is `null` when nobody was signed in (a sign-in with an unknown email).
+     A row whose actor has no employee record is not listed (people are archived, never
+     deleted, so this only happens after `seed_demo.py --reset`, which keeps the audit log).
+   - `total` counts every row the same caller and filter would get, ignoring `limit`/`offset`.
+   - **Scope.** Admin: every row. Manager: only rows about projects of teams they lead, and the
+     deliverables and assignments of those projects; never people, team, salary or sign-in
+     rows (so `type=people`, `teams` or `sign-ins` returns an empty list).
+   - **Privacy.** The stored `details` object is never returned. `sentence` is built on the
+     server from a whitelist per action: names (resolved by joins, so renamed or archived
+     records show their current name; a missing record reads "a deliverable", "a person", ...),
+     plus, for updates, the *names* of the changed fields ("hours per week", "dates"), never
+     their values. No salary, hourly rate or cost figure is ever in a row, for any role; a salary
+     change reads "Alex Admin changed a salary for Ana Silva". Token refreshes are not listed.
+   - Actions listed: `employee_created|role_changed|salary_changed|updated|archived` (people),
+     `team_created|lead_changed|updated|member_added|member_removed|archived` (teams),
+     `project_created|updated|archived` (projects),
+     `deliverable_created|updated|dependencies_changed|archived` (deliverables),
+     `allocation_created|updated|archived` (assignments),
+     `login_success|failure|locked`, `logout`, `refresh_reuse_detected` (sign-ins).
+     Any other action in the table is not listed.
+
 ## 9. Error codes added in this block
 
 | Code | Status | Where |

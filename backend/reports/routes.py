@@ -19,6 +19,8 @@ DELIVERABLE_STATUSES = ("not_started", "in_progress", "done")
 DEFAULT_WEEKS = 12
 MAX_WEEKS = 52
 DEFAULT_THRESHOLD = 32
+DEFAULT_ACTIVITY_LIMIT = 50
+MAX_ACTIVITY_LIMIT = 100
 
 
 # =====================================================================
@@ -60,6 +62,16 @@ def threshold(query: dict) -> int:
         return DEFAULT_THRESHOLD
     if not re.fullmatch(r"[0-9]{1,2}", value) or not 1 <= int(value) <= 40:
         raise BadRequest("Query parameter threshold must be a whole number from 1 to 40.")
+    return int(value)
+
+
+def _whole(query: dict, name: str, default: int, low: int, high: int) -> int:
+    """A whole-number query parameter from low to high, else 400."""
+    value = query.get(name)
+    if value is None:
+        return default
+    if not re.fullmatch(r"[0-9]{1,6}", value) or not low <= int(value) <= high:
+        raise BadRequest(f"Query parameter {name} must be a whole number from {low} to {high}.")
     return int(value)
 
 
@@ -118,6 +130,13 @@ def budget_report(params: dict, query: dict, body: object, headers: dict) -> dic
     return responses.ok(services.budget_report(actor, validation.query_uuid(query, "team_id")))
 
 
+def activity(params: dict, query: dict, body: object, headers: dict) -> dict:
+    actor = _actor(headers, "manager")
+    limit = _whole(query, "limit", DEFAULT_ACTIVITY_LIMIT, 1, MAX_ACTIVITY_LIMIT)
+    offset = _whole(query, "offset", 0, 0, 999999)
+    return responses.ok(services.activity(actor, _choice(query, "type", services.ACTIVITY_TYPES), limit, offset))
+
+
 ROUTES = {
     ("GET", "/project-status"): project_status,
     ("GET", "/at-risk-projects"): at_risk_projects,
@@ -126,6 +145,7 @@ ROUTES = {
     ("GET", "/over-allocated"): over_allocated,
     ("GET", "/dependency-chain"): dependency_chain,
     ("GET", "/budget"): budget_report,
+    ("GET", "/activity"): activity,
 }
 
 

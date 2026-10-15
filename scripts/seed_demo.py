@@ -127,6 +127,74 @@ def _reset() -> Optional[str]:
     return None
 
 
+# A believable recent history for the Activity screen, written through the
+# normal audit module: (days ago, hour, actor, action, entity type, entity key,
+# details). Details hold only labels and field names, never an amount.
+HISTORY = [
+    (21, 9, "admin", "employee_created", "employee", "marta", None),
+    (21, 9, "admin", "employee_created", "employee", "ken", None),
+    (21, 10, "admin", "employee_created", "employee", "ana", None),
+    (21, 10, "admin", "employee_created", "employee", "bo", None),
+    (21, 10, "admin", "employee_created", "employee", "cy", None),
+    (21, 11, "admin", "employee_created", "employee", "di", None),
+    (21, 11, "admin", "employee_created", "employee", "eli", None),
+    (21, 11, "admin", "employee_created", "employee", "fay", None),
+    (21, 12, "admin", "employee_created", "employee", "gus", None),
+    (21, 12, "admin", "employee_created", "employee", "hal", None),
+    (20, 9, "admin", "team_created", "team", "platform", None),
+    (20, 9, "admin", "team_created", "team", "data", None),
+    (20, 10, "admin", "team_member_added", "team", "platform", {"employee_id": "ana"}),
+    (20, 10, "admin", "team_member_added", "team", "platform", {"employee_id": "bo"}),
+    (20, 10, "admin", "team_member_added", "team", "platform", {"employee_id": "cy"}),
+    (20, 10, "admin", "team_member_added", "team", "platform", {"employee_id": "di"}),
+    (20, 11, "admin", "team_member_added", "team", "data", {"employee_id": "eli"}),
+    (20, 11, "admin", "team_member_added", "team", "data", {"employee_id": "fay"}),
+    (20, 11, "admin", "team_member_added", "team", "data", {"employee_id": "gus"}),
+    (16, 14, "marta", "project_created", "project", "billing", None),
+    (16, 15, "ken", "project_created", "project", "lake", None),
+    (15, 9, "marta", "deliverable_created", "deliverable", "spec", None),
+    (15, 9, "marta", "deliverable_created", "deliverable", "docs", None),
+    (15, 9, "marta", "deliverable_created", "deliverable", "legacy", None),
+    (15, 10, "marta", "deliverable_created", "deliverable", "build", None),
+    (15, 10, "marta", "deliverable_created", "deliverable", "qa", None),
+    (15, 10, "marta", "deliverable_created", "deliverable", "launch", None),
+    (15, 13, "admin", "allocation_created", "allocation", ("ana", "billing"), None),
+    (15, 13, "admin", "allocation_created", "allocation", ("bo", "billing"), None),
+    (14, 11, "ken", "deliverable_created", "deliverable", "ingest", None),
+    (14, 11, "ken", "deliverable_created", "deliverable", "model", None),
+    (14, 11, "ken", "deliverable_created", "deliverable", "dash", None),
+    (14, 14, "admin", "allocation_created", "allocation", ("eli", "lake"), None),
+    (14, 14, "admin", "allocation_created", "allocation", ("fay", "lake"), None),
+    (10, 16, "admin", "employee_salary_changed", "employee", "bo", None),
+    (8, 10, "admin", "allocation_created", "allocation", ("cy", "billing"), None),
+    (7, 9, "marta", "project_created", "project", "mobile", None),
+    (7, 10, "marta", "deliverable_created", "deliverable", "design", None),
+    (7, 11, "admin", "allocation_created", "allocation", ("ana", "mobile"), None),
+    (6, 15, "admin", "allocation_created", "allocation", ("gus", "lake"), None),
+    (4, 10, "marta", "deliverable_updated", "deliverable", "spec", {"fields": ["status"]}),
+    (3, 9, "marta", "deliverable_updated", "deliverable", "build", {"fields": ["status"]}),
+    (3, 14, "marta", "project_updated", "project", "billing", {"fields": ["planned_budget"]}),
+    (2, 11, "marta", "deliverable_archived", "deliverable", "legacy", None),
+    (2, 15, "ken", "allocation_updated", "allocation", ("gus", "lake"), {"fields": ["hours_per_week"]}),
+    (2, 16, "admin", "allocation_created", "allocation", ("di", "billing"), None),
+    (1, 9, "ana", "login_success", "employee", "ana", None),
+    (1, 9, "marta", "login_success", "employee", "marta", None),
+    (0, 8, "admin", "login_success", "employee", "admin", None),
+]
+
+
+def _history(ids: dict, now: datetime.datetime) -> None:
+    """Record HISTORY in time order, back-dated from `now` (each row a minute apart within its hour)."""
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    for minute, (days_ago, hour, actor, action, entity_type, entity, details) in enumerate(HISTORY):
+        at = midnight - datetime.timedelta(days=days_ago) + datetime.timedelta(hours=hour, minutes=minute % 60)
+        if at >= now:
+            at = now - datetime.timedelta(minutes=len(HISTORY) - minute)
+        if details and "employee_id" in details:
+            details = {"employee_id": str(ids[details["employee_id"]])}
+        audit.record(action, ids[actor], entity_type, ids[entity], details, at=at)
+
+
 def _seed(passwords: dict, monday: datetime.date) -> dict:
     """Insert everything in one transaction; returns how many rows of each kind."""
     def day(offset: int) -> datetime.date:
@@ -159,10 +227,16 @@ def _seed(passwords: dict, monday: datetime.date) -> dict:
                 db.execute("INSERT INTO deliverable_dependencies (deliverable_id, depends_on_id) "
                            "VALUES (%s, %s)", (ids[key], ids[dependency]))
         for person, project, hours, start, end in ALLOCATIONS:
-            db.execute(
+            ids[(person, project)] = db.query_one(
                 "INSERT INTO allocations (employee_id, project_id, hours_per_week, start_date, "
-                "end_date, created_by) VALUES (%s, %s, %s, %s, %s, %s)",
-                (ids[person], ids[project], hours, day(start), day(end), ids["admin"]))
+                "end_date, created_by) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                (ids[person], ids[project], hours, day(start), day(end), ids["admin"]))["id"]
+        # One deliverable that was dropped: archived (never deleted), so the history can say so.
+        ids["legacy"] = db.query_one(
+            "INSERT INTO deliverables (project_id, name, status, start_date, due_date, archived_at) "
+            "VALUES (%s, 'Legacy CSV export', 'not_started', %s, %s, now()) RETURNING id",
+            (ids["billing"], day(-14), day(-7)))["id"]
+        _history(ids, datetime.datetime.now(datetime.timezone.utc))
         counts = {"employees": len(PEOPLE), "teams": len(TEAMS), "projects": len(PROJECTS),
                   "deliverables": len(DELIVERABLES), "allocations": len(ALLOCATIONS)}
         audit.record("demo_seeded", None, None, None, counts)
